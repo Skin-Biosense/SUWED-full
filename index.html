@@ -1,0 +1,1730 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow, noarchive, nosnippet, noimageindex">
+<meta name="googlebot" content="noindex, nofollow">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="referrer" content="no-referrer">
+<title>Skin-Biosense</title>
+<style>
+  :root{
+    --bg:#10161a;
+    --panel:#182126;
+    --panel-2:#1f2b31;
+    --line:#2b3a42;
+    --ink:#e6eef1;
+    --ink-dim:#8fa3ad;
+    --trace:#7be38c;
+    --primary:#3f8fd6;
+    --warn:#e8a33d;
+    --bad:#e2685f;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--ink)}
+  body{
+    font:400 16px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;
+    padding:env(safe-area-inset-top) 16px calc(24px + env(safe-area-inset-bottom));
+    max-width:900px;margin:0 auto;
+  }
+  .mono{font-family:ui-monospace,"SF Mono",Menlo,monospace;font-variant-numeric:tabular-nums}
+
+  header{display:flex;align-items:baseline;gap:10px;padding:14px 0 10px;flex-wrap:wrap}
+  header h1{font-size:20px;font-weight:600;margin:0;letter-spacing:.2px}
+  header .ver{color:var(--ink-dim);font-size:13px}
+
+  .status{
+    display:flex;align-items:center;gap:10px;
+    background:var(--panel);border:1px solid var(--line);border-radius:10px;
+    padding:11px 14px;margin-bottom:12px;font-size:15px;
+  }
+  .dot{width:10px;height:10px;border-radius:50%;background:var(--bad);flex:none;transition:background .2s}
+  .dot.on{background:var(--trace)}
+  .dot.busy{background:var(--warn)}
+  #statusText{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+  .sample{margin-bottom:12px}
+  .sample input{font-size:17px;min-height:52px}
+
+  .plotwrap{position:relative;background:#0b1114;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+  canvas{display:block;width:100%;height:340px}
+  .plotmeta{position:absolute;top:8px;right:12px;font-size:12px;color:var(--ink-dim);text-align:right;pointer-events:none}
+
+  .row{display:flex;gap:10px;margin:12px 0}
+  button{
+    flex:1;min-height:56px;border:1px solid var(--line);border-radius:10px;
+    background:var(--panel-2);color:var(--ink);font-size:17px;font-weight:600;
+    font-family:inherit;cursor:pointer;
+  }
+  button:active{transform:translateY(1px)}
+  button:disabled{opacity:.38}
+  button:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
+  button.primary{background:var(--primary);border-color:var(--primary);color:#06121c}
+  button.go{background:var(--trace);border-color:var(--trace);color:#08180d}
+  button.off{color:var(--warn)}
+  button.small{min-height:44px;font-size:15px;font-weight:500}
+
+  details{background:var(--panel);border:1px solid var(--line);border-radius:10px;margin:12px 0}
+  summary{padding:14px;font-size:16px;font-weight:600;cursor:pointer;list-style:none}
+  summary::-webkit-details-marker{display:none}
+  summary::after{content:"+";float:right;color:var(--ink-dim);font-weight:400}
+  details[open] summary::after{content:"–"}
+  .body{padding:0 14px 14px}
+
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+  label{display:block;font-size:13px;color:var(--ink-dim);margin-bottom:5px}
+  input,select{
+    width:100%;min-height:46px;padding:0 12px;background:#0d1417;color:var(--ink);
+    border:1px solid var(--line);border-radius:8px;font:inherit;
+    font-family:ui-monospace,"SF Mono",Menlo,monospace;font-variant-numeric:tabular-nums;
+  }
+  input:focus,select:focus{outline:2px solid var(--primary);outline-offset:0}
+  select{font-family:inherit}
+  input::placeholder{color:#5d717b;font-family:-apple-system,system-ui,sans-serif}
+
+  #log{
+    height:170px;overflow:auto;background:#0b1114;border:1px solid var(--line);
+    border-radius:8px;padding:10px;font-size:12px;line-height:1.5;
+    font-family:ui-monospace,"SF Mono",Menlo,monospace;white-space:pre-wrap;word-break:break-all;
+  }
+  #log .tx{color:var(--primary)}
+  #log .rx{color:var(--ink-dim)}
+  #log .err{color:var(--bad)}
+  #log .ok{color:var(--trace)}
+
+  .note{font-size:13px;color:var(--ink-dim);margin:10px 0 0}
+  .cb{display:flex;gap:10px;align-items:center;margin-top:14px;font-size:15px;color:var(--ink)}
+  .cb input{width:24px;height:24px;min-height:0;flex:none}
+  .path{font-family:ui-monospace,"SF Mono",Menlo,monospace;font-size:12px;color:var(--ink-dim);
+        word-break:break-all;margin-top:10px;line-height:1.6}
+
+  .seg{display:flex;gap:0;margin-bottom:10px;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+  .segbtn{flex:1;min-height:42px;border:0;border-radius:0;background:var(--panel);color:var(--ink-dim);
+          font-size:15px;font-weight:600}
+  .segbtn.active{background:var(--panel-2);color:var(--ink)}
+  .segbtn:disabled{opacity:.35}
+  .filebtn{flex:1;min-height:44px;display:flex;align-items:center;justify-content:center;
+           border:1px solid var(--line);border-radius:10px;background:var(--panel-2);
+           color:var(--ink);font-size:15px;font-weight:500;margin:0;cursor:pointer}
+  table.peaks{width:100%;border-collapse:collapse;font-size:13px;margin-top:12px;
+              font-family:ui-monospace,"SF Mono",Menlo,monospace;font-variant-numeric:tabular-nums}
+  table.peaks th{text-align:right;color:var(--ink-dim);font-weight:500;padding:6px 4px;
+                 border-bottom:1px solid var(--line);font-size:11px}
+  table.peaks th:first-child{text-align:left}
+  table.peaks td{text-align:right;padding:7px 4px;border-bottom:1px solid #222e34}
+  table.peaks td:first-child{text-align:left}
+  table.peaks tr.sel td{background:#243138}
+  .ok-tag{color:var(--trace)} .bad-tag{color:var(--bad)}
+  .zone{margin-top:16px}
+  .ztitle{font-size:13px;color:var(--ink-dim);margin-bottom:6px}
+  .bars{display:flex;align-items:flex-end;gap:8px;height:140px;padding-top:20px;border-bottom:1px solid var(--line)}
+  .bar{flex:1;position:relative;border-radius:4px 4px 0 0;min-width:10px}
+  .bv{position:absolute;left:-8px;right:-8px;top:-18px;text-align:center;font-size:11px;white-space:nowrap;
+      font-family:ui-monospace,"SF Mono",Menlo,monospace;color:var(--ink)}
+  .blabels{display:flex;gap:8px;margin-top:4px;font-size:11px;color:var(--ink-dim)}
+  .blabels span{flex:1;min-width:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:center}
+  #planList .cb{margin-top:8px}
+  .drvItem{width:100%;margin:6px 0;text-align:left;min-height:48px;font-size:14px;font-weight:500;display:block}
+  dialog{
+    border:1px solid var(--line);border-radius:12px;background:var(--panel);color:var(--ink);
+    padding:20px;max-width:480px;width:calc(100% - 32px);
+  }
+  dialog::backdrop{background:rgba(0,0,0,.65)}
+  dialog h2{margin:0 0 14px;font-size:18px}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Skin-Biosense</h1>
+  <span class="ver mono">version 5.3.0</span>
+</header>
+
+<div class="status">
+  <span class="dot" id="dot"></span>
+  <span id="statusText">Not connected</span>
+  <span id="batText" class="mono" style="color:var(--ink-dim);font-size:13px;white-space:nowrap"></span>
+</div>
+
+<div class="sample">
+  <label for="sampleName">Sample name</label>
+  <input id="sampleName" type="text" placeholder="Type the sample name before starting" autocapitalize="none" spellcheck="false">
+</div>
+
+<div class="seg" id="viewSeg">
+  <button class="segbtn active" id="segRaw" data-view="raw">Raw</button>
+  <button class="segbtn" id="segTreated" data-view="treated" disabled>Treated</button>
+  <button class="segbtn" id="segAdv" data-view="advanced" disabled>Advanced</button>
+</div>
+
+<div class="plotwrap">
+  <canvas id="plot"></canvas>
+  <div class="plotmeta mono" id="plotmeta"></div>
+</div>
+
+<div class="row">
+  <button id="btnConnect" class="primary">Connect</button>
+  <button id="btnInit" disabled>Initialize</button>
+</div>
+<div class="row">
+  <button id="btnStart" class="go" disabled>Start</button>
+  <button id="btnStop" disabled>Stop</button>
+</div>
+<div class="row">
+  <button id="btnOff" class="off small" disabled>Switch off</button>
+</div>
+<div class="row">
+  <button id="btnExport" class="small" disabled>Export</button>
+  <button id="btnClear" class="small" disabled>Erase graph</button>
+</div>
+<div class="row">
+  <button id="btnImportLocal" class="small">Import locally</button>
+  <button id="btnImportDrive" class="small" disabled>Import from Drive</button>
+</div>
+<input id="importFile" type="file" accept=".txt,text/plain" hidden>
+
+
+<details>
+  <summary>Measurement parameters</summary>
+  <div class="body">
+    <div class="grid">
+      <div><label for="V_start">Start (V)</label><input id="V_start" type="text" inputmode="decimal" value="-0.4"></div>
+      <div><label for="V_end">End (V)</label><input id="V_end" type="text" inputmode="decimal" value="1.6"></div>
+      <div><label for="freq">Frequency (Hz)</label><input id="freq" type="text" inputmode="decimal" value="25"></div>
+      <div><label for="V_step">Step (mV)</label><input id="V_step" type="text" inputmode="decimal" value="5"></div>
+      <div><label for="V_amp">Amplitude (mV)</label><input id="V_amp" type="text" inputmode="decimal" value="25"></div>
+      <div><label for="t_wait">Wait time (ms)</label><input id="t_wait" type="text" inputmode="numeric" value="2000"></div>
+      <div>
+        <label for="GAIN">Gain</label>
+        <select id="GAIN">
+          <option value="1">1 — ±1000 µA</option>
+          <option value="2" selected>2 — ±100 µA</option>
+          <option value="3">3 — ±10 µA</option>
+          <option value="4">4 — ±1 µA</option>
+          <option value="6">6 — auto</option>
+        </select>
+      </div>
+      <div><label for="ShutDownTime">Auto-off (s)</label><input id="ShutDownTime" type="text" inputmode="numeric" value="120"></div>
+    </div>
+  </div>
+</details>
+
+<details>
+  <summary>Peak parameters</summary>
+  <div class="body">
+    <label class="cb"><input type="checkbox" id="applyTreatment" checked><span>Apply signal treatment and integrate automatically at the end of the measurement</span></label>
+    <div class="grid" style="margin-top:14px">
+      <div><label for="pkTh">Height threshold (µA)</label><input id="pkTh" type="text" inputmode="decimal" value="0.05"></div>
+      <div><label for="pkMode">Prominence mode</label><select id="pkMode"><option value="relative" selected>Relative (factor)</option><option value="absolute">Absolute (µA)</option><option value="both">Both (relative and absolute)</option></select></div>
+      <div><label for="pkProm">Relative factor</label><input id="pkProm" type="text" inputmode="decimal" value="0.98"></div>
+      <div><label for="pkAbs">Absolute prominence (µA)</label><input id="pkAbs" type="text" inputmode="decimal" value="0.02"></div>
+      <div><label for="pkMin">Detection from (V)</label><input id="pkMin" type="text" inputmode="decimal" value="-0.4"></div>
+      <div><label for="pkMax">Detection to (V)</label><input id="pkMax" type="text" inputmode="decimal" value="1.6"></div>
+      <div><label for="baseMode">Baseline</label><select id="baseMode"><option value="ma" selected>Moving average (NOVA)</option><option value="hull">Convex envelope</option></select></div>
+      <div><label for="maWin">MA window (points)</label><input id="maWin" type="text" inputmode="numeric" value="1"></div>
+      <div><label for="maIter">MA max iterations</label><input id="maIter" type="text" inputmode="numeric" value="1000"></div>
+    </div>
+    <div class="row">
+      <button class="small" id="btnIntegrate" disabled>Integrate</button>
+      <button class="small" id="btnSavePeaks" disabled>Save peaks</button>
+    </div>
+    <div id="validity" class="note"></div>
+    <div id="peakTable"></div>
+  </div>
+</details>
+
+<details>
+  <summary>Score calculation</summary>
+  <div class="body">
+    <div class="grid">
+      <div><label for="z1a">Zone 1 from (V)</label><input id="z1a" type="text" inputmode="decimal"></div>
+      <div><label for="z1b">Zone 1 to (V)</label><input id="z1b" type="text" inputmode="decimal"></div>
+      <div><label for="z2a">Zone 2 from (V)</label><input id="z2a" type="text" inputmode="decimal"></div>
+      <div><label for="z2b">Zone 2 to (V)</label><input id="z2b" type="text" inputmode="decimal"></div>
+      <div><label for="z3a">Zone 3 from (V)</label><input id="z3a" type="text" inputmode="decimal"></div>
+      <div><label for="z3b">Zone 3 to (V)</label><input id="z3b" type="text" inputmode="decimal"></div>
+    </div>
+    <p class="note">Score = sum of peak areas (µA·V) × 100, for peaks whose Epeak lies in the zone and whose height passes the threshold.</p>
+    <div id="scoreChart"></div>
+  </div>
+</details>
+
+<details>
+  <summary>Overlay</summary>
+  <div class="body">
+    <p class="note" style="margin-top:0">Load previously exported .txt files to compare them with the current curve. Up to 10.</p>
+    <div class="row" style="align-items:center">
+      <label class="filebtn" for="ovFile">Load files</label>
+      <input id="ovFile" type="file" accept=".txt,text/plain" multiple hidden>
+      <button class="small" id="btnClearOv">Clear</button>
+    </div>
+    <div id="ovList" class="note"></div>
+  </div>
+</details>
+
+<details>
+  <summary>Google Drive</summary>
+  <div class="body">
+    <div id="odStatus" class="note" style="margin-top:0"></div>
+    <div class="row"><button class="small" id="btnOd">Test connection</button></div>
+    <div class="path" id="odPath"></div>
+  </div>
+</details>
+
+<details>
+  <summary>BLE log</summary>
+  <div class="body">
+    <div id="log" class="mono"></div>
+    <div class="row"><button class="small" id="btnClearLog">Clear log</button></div>
+  </div>
+</details>
+
+<dialog id="dlgSave">
+  <h2 id="saveTitle">Save measurement</h2>
+  <label for="fname">File name</label>
+  <input id="fname" type="text" value="mesure" autocapitalize="none" spellcheck="false">
+  <div class="path" id="savePath"></div>
+  <div id="planList"></div>
+  <label class="cb"><input type="checkbox" id="localCopy"><span>Also keep a local copy on this device</span></label>
+  <div class="row">
+    <button class="small" id="btnCancelSave">Cancel</button>
+    <button class="small" id="btnShare">Share</button>
+    <button class="small primary" id="btnDoSave">Save</button>
+  </div>
+
+</dialog>
+
+<dialog id="dlgDrive">
+  <h2>Import from Drive</h2>
+  <div class="path" id="drvInfo"></div>
+  <div id="drvList"></div>
+  <div class="row">
+    <button class="small" id="btnDrvRefresh">Refresh</button>
+    <button class="small" id="btnDrvClose">Close</button>
+  </div>
+</dialog>
+
+<script>
+"use strict";
+/* ============================================================================
+   Skin-Biosense v5.3.0
+   Port of the techBASIC "SUWED" program (Fluika OÜ) to Web Bluetooth.
+   Runs in any browser exposing navigator.bluetooth — Bluefy / WebBLE on iPadOS,
+   Chrome / Edge on Android. Deviations from the .bas are marked [DIFF].
+   ========================================================================== */
+
+/* --- Nordic UART service, as in the .bas (lowercase UUIDs) ---------------- */
+const NUS_SERVICE = '6e400001-b5a3-f393-e0a9-e50e24dcca9e';
+const NUS_WRITE   = '6e400002-b5a3-f393-e0a9-e50e24dcca9e';
+const NUS_NOTIFY  = '6e400003-b5a3-f393-e0a9-e50e24dcca9e';
+
+/* --- Fixed protocol constants (no longer exposed in the UI) --------------- */
+const TRANSMISSION_MODE = 1;        // 1 = stream during the measurement
+const PARAM_LEADING_SPACE = false;  // set true if the firmware expects "A( 42093)"
+const INT_MODE = 'round';           // 'round' | 'trunc' — see release notes
+const NR_DATA_POINTS = 1510;
+
+/* --- Google Drive endpoint (Apps Script web app) -------------------------- */
+/* Deploy Code.gs on capteur.skinbiosense@gmail.com, then paste the /exec URL
+   and the shared token below. Both must match the script. */
+const GAS_URL   = 'https://script.google.com/macros/s/AKfycbxnk83dpXHCOL3_kqILJ2qEbT8fFgvRCPD_VJiajN27vNMGb51VF58nWqlCq72SOIRAxw/exec';               // <<< https://script.google.com/macros/s/AKfy.../exec
+const GAS_TOKEN = 'efzetf478sdrztg45erg2e1tg5-y7bft874h8thbed';               // <<< same string as TOKEN in Code.gs
+const DRIVE_ROOT = 'SUWED v5';
+
+/* --- Calibration (default values from the .bas, overwritten by Initialize) - */
+const cal = {
+  pot_a: -80.7662e-6,
+  pot_b: 2.99969,
+  ADC_a: [3.915487e-2, 4.014471e-3, 4.026303e-4, 3.861204e-5],
+  ADC_b: [-1.166343e3, -1.195791e2, -1.199943e1, -1.140467],
+  DAC_a: null, DAC_b: null
+};
+
+let cfg = {}, der = {};
+let dev = null, gatt = null, chWrite = null, chNotify = null;
+let devName = '';
+let comMODE = 0;
+let userDisconnect = false;
+const cs = { names:[], params:[], ri:0, run:0, wait:0 };
+let regs = [], regsi = 0;
+let pts = [], lastIndex = -1;
+let watchdog = null, retries = 0;
+let measuredSample = '';
+let framesLost = 0, stopped = false;
+let lastSavedName = '';   // name Code.gs actually used for this run's raw file
+let proc = null;                 // result of runTreatment()
+let shownPeaks = [];             // peaks after threshold and range filtering
+let viewMode = 'raw';
+let overlays = [];               // [{name, data, color}]
+let selPeak = -1;
+let measuredAt = null;
+const OV_COLORS = ['#e8a33d', '#3f8fd6', '#c77dd6', '#f0c75e', '#5fd3c8', '#e06c9f', '#9bd45a', '#f08a4b', '#8aa1ff', '#d9d9d9'];
+
+/* --- Helpers -------------------------------------------------------------- */
+const $ = id => document.getElementById(id);
+const num = (id, d) => { const v = parseFloat($(id).value.replace(',', '.')); return Number.isFinite(v) ? v : d; };
+const toInt = x => INT_MODE === 'trunc' ? Math.trunc(x) : Math.round(x);
+
+function log(msg, cls) {
+  const el = $('log'), t = new Date().toISOString().substr(11, 8);
+  const s = document.createElement('span');
+  s.className = cls || ''; s.textContent = t + '  ' + msg + '\n';
+  el.appendChild(s);
+  while (el.childNodes.length > 400) el.removeChild(el.firstChild);
+  el.scrollTop = el.scrollHeight;
+}
+function setStatus(text, state) {
+  $('statusText').textContent = text;
+  $('dot').className = 'dot' + (state ? ' ' + state : '');
+}
+function sanitize(s) {
+  return (s || '').trim().replace(/[\\/:*?"<>|#%]/g, '-').replace(/\s+/g, '_').slice(0, 80);
+}
+function today() { return new Date().toLocaleDateString('sv-SE'); }  // YYYY-MM-DD, local time
+
+/* --- Parameters and derived registers (head of the .bas) ------------------ */
+function readConfig() {
+  cfg = {
+    V_start: num('V_start', -0.4),
+    V_end:   num('V_end', 1.6),
+    freq:    num('freq', 25),
+    V_step:  num('V_step', 5),
+    V_amp:   num('V_amp', 25),
+    t_wait:  Math.round(num('t_wait', 2000)),
+    GAIN:    parseInt($('GAIN').value, 10),
+    ShutDownTime: Math.round(num('ShutDownTime', 120))
+  };
+  computeDerived();
+}
+function computeDerived() {
+  const a = cal.pot_a, b = cal.pot_b, d = {};
+  d.D_start = toInt((cfg.V_start - b) / a);
+  d.D_T     = toInt(500.0 / cfg.freq);
+  d.D_step  = toInt(cfg.V_step / (1000 * Math.abs(a)));
+  d.D_amp   = toInt(cfg.V_amp / (1000 * Math.abs(a)));
+  d.N_Steps = 0;
+  if (cfg.V_step > 0) {
+    d.N_Steps = toInt(2000 * Math.abs(cfg.V_start - cfg.V_end) / cfg.V_step);
+    if (d.N_Steps > 1500) { d.N_Steps = 1500; log('Too many points, capped at 1500', 'err'); }
+  }
+  der = d;
+}
+
+/* --- BLE connection ------------------------------------------------------- */
+async function connect() {
+  if (!navigator.bluetooth) {
+    setStatus('Web Bluetooth unavailable in this browser', 'busy');
+    log('navigator.bluetooth missing. On iPad use Bluefy or WebBLE; on Android use Chrome.', 'err');
+    return;
+  }
+  try {
+    setStatus('Looking for a device…', 'busy');
+    dev = await navigator.bluetooth.requestDevice({
+      filters: [{ namePrefix: 'SUWED' }],
+      optionalServices: [NUS_SERVICE, 'battery_service']
+    });
+    devName = dev.name || 'SUWED';
+    dev.addEventListener('gattserverdisconnected', onDisconnected);
+    await openGatt();
+  } catch (e) {
+    setStatus('Connection cancelled or failed');
+    log('requestDevice: ' + e.message, 'err');
+  }
+}
+async function openGatt() {
+  setStatus('Connecting to ' + devName + '…', 'busy');
+  gatt = await dev.gatt.connect();
+  const svc = await gatt.getPrimaryService(NUS_SERVICE);
+  chWrite  = await svc.getCharacteristic(NUS_WRITE);
+  chNotify = await svc.getCharacteristic(NUS_NOTIFY);
+  chNotify.addEventListener('characteristicvaluechanged', onNotify);
+  await chNotify.startNotifications();
+  log('Connected to ' + devName, 'ok');
+  batUnsupported = false;
+  readBattery();
+  startBatteryWatch();
+  setStatus(devName + ' connected', 'on');
+  enable(true); renderOd();
+}
+function onDisconnected() {
+  $('batText').textContent = '';
+  if (batTimer) { clearInterval(batTimer); batTimer = null; }
+  enable(false); clearWatchdog(); cs.run = 0;
+  if (userDisconnect) { userDisconnect = false; setStatus('Disconnected'); return; }
+  setStatus('Connection lost — reconnecting…', 'busy');
+  log('Connection lost', 'err');
+  setTimeout(() => {
+    if (!dev) return;
+    openGatt().catch(e => { setStatus('Reconnection failed'); log('Reconnect: ' + e.message, 'err'); });
+  }, 1500);
+}
+function enable(on) {
+  ['btnInit', 'btnStart', 'btnOff'].forEach(id => $(id).disabled = !on);
+  if (!on) $('btnStop').disabled = true;
+  $('btnConnect').textContent = on ? 'Disconnect' : 'Connect';
+}
+
+/* --- Battery ---------------------------------------------------------------
+   Reads the standard Bluetooth Battery Service (0x180F / 0x2A19). The Fluika
+   command set has no battery command; if this sensor does not expose the
+   service, the indicator says so and the check stops. Reads are skipped while
+   a measurement runs, so they never interleave with the data stream. */
+let batTimer = null, batUnsupported = false;
+async function readBattery() {
+  if (!gatt || !gatt.connected || cs.run || batUnsupported) return;
+  try {
+    const svc = await gatt.getPrimaryService('battery_service');
+    const ch = await svc.getCharacteristic('battery_level');
+    const v = await ch.readValue();
+    const pct = v.getUint8(0);
+    $('batText').textContent = 'Battery ' + pct + '%';
+    log('Battery ' + pct + '%', 'ok');
+  } catch (e) {
+    batUnsupported = true;
+    if (batTimer) { clearInterval(batTimer); batTimer = null; }
+    $('batText').textContent = 'Battery n/a';
+    log('Battery: not exposed by this sensor (' + (e && e.name ? e.name : 'error') + ')', 'rx');
+  }
+}
+function startBatteryWatch() {
+  if (batTimer) clearInterval(batTimer);
+  batTimer = setInterval(() => { if (!cs.run) readBattery(); }, 60000);
+}
+
+/* --- Command transmission (sendToUWED) ------------------------------------ */
+function fmtParam(p) {
+  const s = String(Math.trunc(p));
+  return (PARAM_LEADING_SPACE && p >= 0) ? ' ' + s : s;
+}
+async function sendToUWED(str) {
+  if (!chWrite) return;
+  const b = new Uint8Array(str.length);
+  for (let i = 0; i < str.length; i++) b[i] = str.charCodeAt(i) & 0xff;
+  try {
+    if (chWrite.writeValueWithResponse) await chWrite.writeValueWithResponse(b);
+    else await chWrite.writeValue(b);
+    log('TX ' + str, 'tx');
+  } catch (e) { log('TX failed ' + str + ': ' + e.message, 'err'); }
+}
+
+/* --- Command stack (CS_*) ------------------------------------------------- */
+function csReset() { cs.names = []; cs.params = []; cs.ri = 0; cs.run = 0; cs.wait = 0; }
+function csAdd(n, p) { cs.names.push(n); cs.params.push(p); }
+function csSendPending() {
+  const n = cs.names[cs.ri];
+  sendToUWED(n + '(' + fmtParam(cs.params[cs.ri]) + ')');
+  armWatchdog(n);
+}
+function csStart() {
+  if (!cs.names.length) return;
+  cs.ri = 0; cs.run = 1; cs.wait = 0;
+  pts = []; lastIndex = -1;
+  csSendPending();
+}
+/* [DIFF] The .bas only resends after 5 mismatching frames, so never on total
+   silence. Time-based watchdog added, disabled during "M". */
+function armWatchdog(name) {
+  clearWatchdog();
+  if (name === 'M') return;
+  watchdog = setTimeout(() => {
+    if (!cs.run) return;
+    if (retries++ < 5) { log('No reply, resending', 'err'); csSendPending(); }
+    else { cs.run = 0; setStatus('No reply from device'); log('Giving up after 5 attempts', 'err'); }
+  }, 2500);
+}
+function clearWatchdog() { if (watchdog) { clearTimeout(watchdog); watchdog = null; } retries = 0; }
+
+function onNotify(ev) {
+  const dv = ev.target.value;
+  csProc(new Uint8Array(dv.buffer, dv.byteOffset, dv.byteLength));
+}
+function csProc(a) {
+  if (a.length < 2 || !cs.run) return;
+  const comType = a[1], expected = cs.names[cs.ri];
+  if (expected === undefined) return;
+
+  if (expected.charCodeAt(0) === comType - 32) {
+    clearWatchdog(); cs.ri++; cs.wait = 0;
+    log('RX ack ' + String.fromCharCode(comType), 'rx');
+    if (comType === 0x74) parseRegister(a);           // 't'
+    if (cs.ri < cs.names.length) csSendPending();
+    else { cs.run = 0; csDone(); }
+    return;
+  }
+  if (expected === 'M') {
+    if (comType === 0x4d) procData(a);                // 'M' data frame
+    else if (comType === 0x71) {                      // 'q' scan complete
+      clearWatchdog(); cs.ri++; cs.wait = 0;
+      if (cs.ri < cs.names.length) csSendPending();
+      else { cs.run = 0; csDone(); }
+    }
+    return;
+  }
+  cs.wait++;
+  if (cs.wait > 5) { csSendPending(); cs.wait = 0; }
+}
+function csDone() {
+  clearWatchdog();
+  if (comMODE === 1) {
+    $('btnStop').disabled = true;
+    const lost = framesLost ? ' — ' + framesLost + ' frames lost' : '';
+    setStatus('Measurement complete — ' + pairCount() + ' points' + lost, lost ? 'busy' : 'on');
+    log('Measurement complete: ' + pairCount() + ' points, ' + framesLost + ' lost',
+        framesLost ? 'err' : 'ok');
+    if ($('applyTreatment').checked) runAndShowTreatment(true);
+    openSavePlan(buildSavePlan());
+  } else {
+    applyRegisters();
+    setStatus(devName + ' — calibration loaded, ready', 'on');
+    log('Calibration loaded', 'ok');
+    readBattery();
+  }
+  refreshButtons();
+}
+
+/* --- Registers (T / t) ---------------------------------------------------- */
+function parseRegister(a) {
+  let s = '';
+  for (let i = 3; i <= 19 && i < a.length; i++) if (a[i] !== 0x20) s += String.fromCharCode(a[i]);
+  regsi++;
+  if (regsi <= 20) regs[regsi - 1] = s;
+}
+let calLoaded = false;
+
+function applyRegisters() {
+  const v = i => parseFloat(regs[i]) || 0;
+  cal.DAC_a = v(4) / (-1e11);
+  cal.DAC_b = v(5) / 1e6;
+  cal.ADC_a[0] = v(6)  / 1e8;  cal.ADC_b[0] = v(7)  / 1e3;
+  cal.ADC_a[1] = v(8)  / 1e9;  cal.ADC_b[1] = v(9)  / 1e4;
+  cal.ADC_a[2] = v(10) / 1e10; cal.ADC_b[2] = v(11) / 1e5;
+  cal.ADC_a[3] = v(12) / 1e11; cal.ADC_b[3] = v(13) / 1e6;
+
+  /* [FIX v4.0.1] The .bas reads DAC_a/DAC_b and then never uses them, leaving
+     the potential axis on hard-coded constants. On the test device that shifted
+     the whole axis by +0.227 V. The per-device values are applied here. */
+  if (Number.isFinite(cal.DAC_a) && Number.isFinite(cal.DAC_b) &&
+      cal.DAC_a < 0 && cal.DAC_b > 0.5 && cal.DAC_b < 5) {
+    log('DAC cal: a=' + cal.DAC_a.toExponential(6) + '  b=' + cal.DAC_b.toFixed(6) +
+        '  (was a=' + cal.pot_a.toExponential(6) + '  b=' + cal.pot_b.toFixed(6) + ')', 'ok');
+    cal.pot_a = cal.DAC_a;
+    cal.pot_b = cal.DAC_b;
+    calLoaded = true;
+    computeDerived();
+  } else {
+    log('DAC cal out of range (a=' + cal.DAC_a + ' b=' + cal.DAC_b + ') — keeping defaults', 'err');
+  }
+}
+
+/* --- Sequences ------------------------------------------------------------ */
+function initializeUWED() {
+  readConfig();
+  if (!calLoaded) log('Warning: Initialize not run — using default calibration', 'err');
+  pts = []; lastIndex = -1; framesLost = 0; stopped = false; lastSavedName = '';
+  resetTreatment(); measuredAt = new Date();
+  measuredSample = sanitize($('sampleName').value);
+  newMeasureRun();
+  comMODE = 1;
+  $('btnStop').disabled = false;
+  csReset();
+  csAdd('A', der.D_start);
+  csAdd('X', 0);
+  csAdd('S', 14);
+  csAdd('U', cfg.ShutDownTime * 1000);
+  csAdd('U', 1);
+  csAdd('K', TRANSMISSION_MODE);
+  csAdd('B', cfg.GAIN - 1);
+  csAdd('E', der.D_T);
+  csAdd('J', cfg.t_wait);
+  if (cfg.V_end > cfg.V_start) {
+    csAdd('G', -1 * (der.D_step + 2 * der.D_amp));
+    csAdd('I', 2 * der.D_amp);
+  } else {
+    csAdd('G', der.D_step + 2 * der.D_amp);
+    csAdd('I', -2 * der.D_amp);
+  }
+  csAdd('L', der.N_Steps);
+  csAdd('M', 0);
+  csStart();
+  setStatus('Measuring…', 'busy');
+  draw();
+}
+function readRegisters() {
+  readConfig();
+  comMODE = 0; regs = []; regsi = 0;
+  csReset();
+  csAdd('X', 0);
+  csAdd('S', 14);
+  csAdd('U', cfg.ShutDownTime * 1000);
+  for (let i = 1; i <= 20; i++) csAdd('T', i - 1);
+  csStart();
+  setStatus('Reading registers…', 'busy');
+}
+
+/* --- Data decoding (procData) -------------------------------------------- */
+function beVal(a, b, e) { let s = a[b]; for (let i = b + 1; i <= e; i++) s = s * 256 + a[i]; return s; }
+function pushPoint(a, gi, tsA, tsB, vA, vB, aA, aB) {
+  const G = a[gi], gIdx = Math.min(3, Math.max(0, G));
+  const dVr = beVal(a, vA, vB), dADC = beVal(a, aA, aB);
+  pts.push({
+    G: G, Ts: beVal(a, tsA, tsB), dVr: dVr,
+    Vr: dVr * cal.pot_a + cal.pot_b,
+    dADC: dADC,
+    IuA: cal.ADC_a[gIdx] * dADC + cal.ADC_b[gIdx]
+  });
+}
+function procData(a) {
+  if (a[0] === lastIndex) return;
+  /* Frames carry a rolling one-byte index. A jump means the radio dropped
+     cycles — the curve then looks shifted even though the sweep was correct. */
+  if (lastIndex >= 0) {
+    const expected = (lastIndex + 1) & 0xff;
+    if (a[0] !== expected) {
+      const missed = (a[0] - expected + 256) & 0xff;
+      framesLost += missed;
+      log('Frame gap: ' + missed + ' lost (index ' + expected + ' -> ' + a[0] + ')', 'err');
+    }
+  }
+  lastIndex = a[0];
+  if (a[1] !== 0x4d || a.length < 16) return;
+  if (pts.length + 2 > NR_DATA_POINTS) return;
+  pushPoint(a, 2,  3,  4,  5,  6,   7,  8);
+  pushPoint(a, 9, 10, 11, 12, 13, 14, 15);
+  setStatus('Receiving data…', 'busy');
+  draw(); refreshButtons();
+}
+
+/* --- SWV curve: (V1+V2)/2 vs I2-I1 --------------------------------------- */
+function pairCount() { return Math.floor(pts.length / 2); }
+function swvPairs() {
+  const out = [];
+  for (let k = 0; k < pairCount(); k++) {
+    const p1 = pts[2 * k], p2 = pts[2 * k + 1];
+    out.push([(p2.Vr + p1.Vr) / 2, p2.IuA - p1.IuA]);
+  }
+  /* [FIX v4.0.1] The device emits one settling pair before the ramp; it sits
+     off the regular grid. Drop it when its gap exceeds twice the nominal step. */
+  if (out.length > 3) {
+    const gap0 = Math.abs(out[1][0] - out[0][0]);
+    const gap1 = Math.abs(out[2][0] - out[1][0]);
+    if (gap1 > 0 && gap0 > 2 * gap1) out.shift();
+  }
+  return out;
+}
+
+/* --- Plot ----------------------------------------------------------------- */
+const cv = $('plot'), ctx = cv.getContext('2d');
+
+/* Round tick step: X spans exactly Start..End, gridlines on round values. */
+function niceStep(range, maxTicks) {
+  const cands = [0.01, 0.02, 0.025, 0.05, 0.1, 0.2, 0.25, 0.5, 1, 2, 2.5, 5, 10, 20, 50, 100, 200, 500, 1000];
+  for (const s of cands) if (range / s <= maxTicks) return s;
+  return cands[cands.length - 1];
+}
+function ticksIn(lo, hi, step) {
+  const out = [];
+  const first = Math.ceil(lo / step - 1e-9) * step;
+  for (let v = first; v <= hi + 1e-9; v += step) out.push(Math.abs(v) < 1e-12 ? 0 : v);
+  return out;
+}
+function fmtTick(v, step) {
+  const dec = Math.max(0, -Math.floor(Math.log10(step)) + (String(step).indexOf('5') > 1 ? 1 : 0));
+  return v.toFixed(Math.min(4, dec));
+}
+
+function sizeCanvas() {
+  const r = cv.getBoundingClientRect(), dpr = window.devicePixelRatio || 1;
+  cv.width = Math.round(r.width * dpr);
+  cv.height = Math.round(r.height * dpr);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  draw();
+}
+
+function draw() {
+  const dpr = window.devicePixelRatio || 1;
+  const w = cv.width / dpr, h = cv.height / dpr;
+  const m = { l: 64, r: 16, t: 16, b: 42 };
+  ctx.clearRect(0, 0, w, h);
+
+  const isTr = viewMode === 'treated' && proc;
+  const isAdv = viewMode === 'advanced' && proc;
+  const isView = isTr || isAdv;
+
+  // Treated and advanced views show the detection window only.
+  let x0 = Math.min(cfg.V_start, cfg.V_end), x1 = Math.max(cfg.V_start, cfg.V_end);
+  if (isView) {
+    const a = num('pkMin', cfg.V_start), b = num('pkMax', cfg.V_end);
+    if (Math.abs(b - a) > 1e-9) { x0 = Math.min(a, b); x1 = Math.max(a, b); }
+  }
+  if (!isView && run && run.source === 'import' && currentPairs().length > 1) {
+    const xs = currentPairs().map(p => p[0]);
+    x0 = Math.min.apply(null, xs); x1 = Math.max.apply(null, xs);
+  }
+  const inWin = p => p[0] >= x0 && p[0] <= x1;
+
+  const main = isAdv ? proc.advanced : (isTr ? proc.treated : currentPairs());
+  const ovs = overlays.map(o => {
+    if (!isView) return o.data;
+    if (isAdv) return null;
+    const op = ovProc(o);
+    return op ? op.treated : null;
+  });
+
+  const all = [];
+  const collect = d => { if (d) d.forEach(p => { if (inWin(p)) all.push(p[1]); }); };
+  collect(main);
+  ovs.forEach(collect);
+  if (isTr && proc) collect(proc.treated);
+  if (!isView && proc) collect(proc.baseline);
+  let y0 = -100, y1 = 100;
+  if (all.length > 1) {
+    y0 = Math.min.apply(null, all); y1 = Math.max.apply(null, all);
+    if (y1 - y0 < 1e-12) { y0 -= 1; y1 += 1; }
+    const pad = (y1 - y0) * 0.08; y0 -= pad; y1 += pad;
+  }
+  const X = v => m.l + (v - x0) / (x1 - x0) * (w - m.l - m.r);
+  const Y = v => h - m.b - (v - y0) / (y1 - y0) * (h - m.t - m.b);
+
+  const xStep = niceStep(x1 - x0, Math.max(3, Math.floor((w - m.l - m.r) / 48)));
+  const yStep = niceStep(y1 - y0, 6);
+  ctx.strokeStyle = '#223037'; ctx.lineWidth = 1;
+  ctx.fillStyle = '#8fa3ad'; ctx.font = '11px ui-monospace,Menlo,monospace';
+  ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+  for (const yv of ticksIn(y0, y1, yStep)) {
+    const py = Y(yv);
+    ctx.beginPath(); ctx.moveTo(m.l, py); ctx.lineTo(w - m.r, py); ctx.stroke();
+    ctx.fillText(fmtTick(yv, yStep), m.l - 8, py);
+  }
+  ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+  for (const xv of ticksIn(x0, x1, xStep)) {
+    const px = X(xv);
+    ctx.beginPath(); ctx.moveTo(px, m.t); ctx.lineTo(px, h - m.b); ctx.stroke();
+    ctx.fillText(fmtTick(xv, xStep), px, h - m.b + 8);
+  }
+  ctx.strokeStyle = '#33454e'; ctx.strokeRect(m.l, m.t, w - m.l - m.r, h - m.t - m.b);
+
+  ctx.fillStyle = '#8fa3ad'; ctx.font = '12px -apple-system,system-ui,sans-serif';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+  ctx.fillText('Potential working vs ref (V)', (m.l + w - m.r) / 2, h - 8);
+  ctx.save();
+  ctx.translate(15, (m.t + h - m.b) / 2); ctx.rotate(-Math.PI / 2);
+  ctx.textBaseline = 'top';
+  ctx.fillText(isAdv ? 'Model current (µA)' :
+               (isTr ? 'Baseline-corrected current (µA)' : 'Current working electrode (µA)'), 0, 0);
+  ctx.restore();
+
+  ctx.save();
+  ctx.beginPath(); ctx.rect(m.l, m.t, w - m.l - m.r, h - m.t - m.b); ctx.clip();
+
+  const line = (d, color, width, dash) => {
+    if (!d || d.length < 2) return;
+    ctx.setLineDash(dash || []); ctx.strokeStyle = color; ctx.lineWidth = width;
+    ctx.beginPath();
+    d.forEach((p, i) => i ? ctx.lineTo(X(p[0]), Y(p[1])) : ctx.moveTo(X(p[0]), Y(p[1])));
+    ctx.stroke(); ctx.setLineDash([]);
+  };
+
+  ovs.forEach((d, i) => line(d, overlays[i].color, 1.5));
+
+  if (isAdv) {
+    line(proc.advanced, '#c77dd6', 2, [6, 3]);
+  } else if (isTr) {
+    shownPeaks.forEach((p, idx) => {
+      const seg = proc.treated.filter(q => q[0] >= p.vmin && q[0] <= p.vmax);
+      if (seg.length > 1) {
+        ctx.fillStyle = idx === selPeak ? 'rgba(123,227,140,.34)' : 'rgba(123,227,140,.15)';
+        ctx.beginPath(); ctx.moveTo(X(seg[0][0]), Y(0));
+        seg.forEach(q => ctx.lineTo(X(q[0]), Y(q[1])));
+        ctx.lineTo(X(seg[seg.length - 1][0]), Y(0)); ctx.closePath(); ctx.fill();
+      }
+      ctx.strokeStyle = idx === selPeak ? '#e6eef1' : '#5f7b87';
+      ctx.lineWidth = 1; ctx.setLineDash([3, 3]);
+      [p.vmin, p.vmax].forEach(v => {
+        ctx.beginPath(); ctx.moveTo(X(v), m.t); ctx.lineTo(X(v), h - m.b); ctx.stroke();
+      });
+      ctx.setLineDash([]);
+      ctx.strokeStyle = '#e8a33d'; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.moveTo(X(p.vs), Y(p.height / 2)); ctx.lineTo(X(p.ve), Y(p.height / 2)); ctx.stroke();
+      ctx.strokeStyle = '#c77dd6';
+      ctx.beginPath(); ctx.moveTo(X(p.vmin), Y(0)); ctx.lineTo(X(p.vmax), Y(0)); ctx.stroke();
+      ctx.fillStyle = '#e6eef1';
+      ctx.beginPath(); ctx.arc(X(p.E), Y(p.height), 3.5, 0, 6.2832); ctx.fill();
+    });
+    line(proc.treated, '#7be38c', 2);
+  } else {
+    const pairs = currentPairs();
+    if (proc && proc.clipped > 0) line(pairs.slice(proc.nKept - 1), '#4a5b64', 2);
+    line(pairs.slice(0, proc ? proc.nKept : pairs.length), '#7be38c', 2);
+    if (proc) line(proc.baseline, '#e8a33d', 1.5, [5, 4]);
+  }
+  ctx.restore();
+
+  const nm = $('sampleName').value.trim();
+  const tag = isAdv ? 'advanced' : (isTr ? 'treated' : '');
+  $('plotmeta').textContent = [nm, tag].filter(Boolean).join('  ·  ') ||
+    (main.length ? '' : 'Square wave voltammetry');
+}
+
+/* --- File content: 6 significant digits, "#" metadata header -------------- */
+const fmt6 = v => Number(v).toPrecision(6);
+
+/* No header: the files contain nothing but numbers, as in the original export.
+   The reader below still skips "#" lines, so headed files stay loadable. */
+/* Files hold numbers only, plus one header line naming the columns. */
+function rawText() {
+  return 'E(V) I(µA)\n' + currentPairs().map(p => fmt6(p[0]) + ' ' + fmt6(p[1])).join('\n') + '\n';
+}
+function treatedText() {
+  if (!proc) return '';
+  return 'E(V) I_treated(µA)\n' + proc.treated.map(p => fmt6(p[0]) + ' ' + fmt6(p[1])).join('\n') + '\n';
+}
+function advancedText() {
+  if (!proc || !proc.advanced.length) return '';
+  return 'E(V) I_advanced(µA)\n' + proc.advanced.map(p => fmt6(p[0]) + ' ' + fmt6(p[1])).join('\n') + '\n';
+}
+function peaksText() {
+  return 'Epeak(V) Area(µA.V) Height(µA) FWHM(V) Wbase(V)\n' +
+    shownPeaks.map(p => [p.E.toFixed(3)].concat([p.area, p.height, p.fwhm, p.wbase].map(fmt6)).join(' ')).join('\n') + '\n';
+}
+function exportText() { return rawText(); }
+function exportText() { return rawText(); }
+
+/* ==========================================================================
+   Signal treatment — ported from Fluika's SP_* subroutines
+   Deviations, all agreed: no 2x decimation in the baseline step, no 500-point
+   cap, sample standard deviation (n-1), and the convex minorant computed
+   directly instead of by relaxation (same fixed point, 5e-15 uA apart).
+   ========================================================================== */
+const SGOLAY=[
+[0.33043,0.27391,0.22174,0.17391,0.13043,0.091304,0.056522,0.026087,3.4694e-17,-0.021739,-0.03913,-0.052174,-0.06087,-0.065217,-0.065217,-0.06087,-0.052174,-0.03913,-0.021739,-2.7756e-17,0.026087,0.056522,0.091304],
+[0.27391,0.23083,0.19091,0.15415,0.12055,0.090119,0.062846,0.038735,0.017787,-1.7347e-18,-0.014625,-0.026087,-0.034387,-0.039526,-0.041502,-0.040316,-0.035968,-0.028458,-0.017787,-0.0039526,0.013043,0.033202,0.056522],
+[0.22174,0.19091,0.16217,0.13552,0.11095,0.088481,0.068097,0.049802,0.033597,0.019481,0.0074534,-0.0024845,-0.010333,-0.016093,-0.019763,-0.021344,-0.020836,-0.018238,-0.013552,-0.0067758,0.0020892,0.013043,0.026087],
+[0.17391,0.15415,0.13552,0.11801,0.10164,0.086392,0.072276,0.059289,0.047431,0.036702,0.027103,0.018634,0.011293,0.0050819,-2.6021e-18,-0.0039526,-0.0067758,-0.0084698,-0.0090344,-0.0084698,-0.0067758,-0.0039526,-2.7756e-17],
+[0.13043,0.12055,0.11095,0.10164,0.092603,0.083851,0.075381,0.067194,0.059289,0.051666,0.044325,0.037267,0.030491,0.023998,0.017787,0.011858,0.0062112,0.00084698,-0.0042349,-0.0090344,-0.013552,-0.017787,-0.021739],
+[0.091304,0.090119,0.088481,0.086392,0.083851,0.080858,0.077414,0.073518,0.06917,0.06437,0.059119,0.053416,0.047261,0.040655,0.033597,0.026087,0.018125,0.009712,0.00084698,-0.0084698,-0.018238,-0.028458,-0.03913],
+[0.056522,0.062846,0.068097,0.072276,0.075381,0.077414,0.078374,0.078261,0.077075,0.074816,0.071485,0.067081,0.061604,0.055054,0.047431,0.038735,0.028967,0.018125,0.0062112,-0.0067758,-0.020836,-0.035968,-0.052174],
+[0.026087,0.038735,0.049802,0.059289,0.067194,0.073518,0.078261,0.081423,0.083004,0.083004,0.081423,0.078261,0.073518,0.067194,0.059289,0.049802,0.038735,0.026087,0.011858,-0.0039526,-0.021344,-0.040316,-0.06087],
+[-9.7145e-17,0.017787,0.033597,0.047431,0.059289,0.06917,0.077075,0.083004,0.086957,0.088933,0.088933,0.086957,0.083004,0.077075,0.06917,0.059289,0.047431,0.033597,0.017787,-2.7756e-17,-0.019763,-0.041502,-0.065217],
+[-0.021739,-5.5511e-17,0.019481,0.036702,0.051666,0.06437,0.074816,0.083004,0.088933,0.092603,0.094015,0.093168,0.090062,0.084698,0.077075,0.067194,0.055054,0.040655,0.023998,0.0050819,-0.016093,-0.039526,-0.065217],
+[-0.03913,-0.014625,0.0074534,0.027103,0.044325,0.059119,0.071485,0.081423,0.088933,0.094015,0.096669,0.096894,0.094692,0.090062,0.083004,0.073518,0.061604,0.047261,0.030491,0.011293,-0.010333,-0.034387,-0.06087],
+[-0.052174,-0.026087,-0.0024845,0.018634,0.037267,0.053416,0.067081,0.078261,0.086957,0.093168,0.096894,0.098137,0.096894,0.093168,0.086957,0.078261,0.067081,0.053416,0.037267,0.018634,-0.0024845,-0.026087,-0.052174],
+[-0.06087,-0.034387,-0.010333,0.011293,0.030491,0.047261,0.061604,0.073518,0.083004,0.090062,0.094692,0.096894,0.096669,0.094015,0.088933,0.081423,0.071485,0.059119,0.044325,0.027103,0.0074534,-0.014625,-0.03913],
+[-0.065217,-0.039526,-0.016093,0.0050819,0.023998,0.040655,0.055054,0.067194,0.077075,0.084698,0.090062,0.093168,0.094015,0.092603,0.088933,0.083004,0.074816,0.06437,0.051666,0.036702,0.019481,-5.5511e-17,-0.021739],
+[-0.065217,-0.041502,-0.019763,-4.1633e-17,0.017787,0.033597,0.047431,0.059289,0.06917,0.077075,0.083004,0.086957,0.088933,0.088933,0.086957,0.083004,0.077075,0.06917,0.059289,0.047431,0.033597,0.017787,-8.3267e-17],
+[-0.06087,-0.040316,-0.021344,-0.0039526,0.011858,0.026087,0.038735,0.049802,0.059289,0.067194,0.073518,0.078261,0.081423,0.083004,0.083004,0.081423,0.078261,0.073518,0.067194,0.059289,0.049802,0.038735,0.026087],
+[-0.052174,-0.035968,-0.020836,-0.0067758,0.0062112,0.018125,0.028967,0.038735,0.047431,0.055054,0.061604,0.067081,0.071485,0.074816,0.077075,0.078261,0.078374,0.077414,0.075381,0.072276,0.068097,0.062846,0.056522],
+[-0.03913,-0.028458,-0.018238,-0.0084698,0.00084698,0.009712,0.018125,0.026087,0.033597,0.040655,0.047261,0.053416,0.059119,0.06437,0.06917,0.073518,0.077414,0.080858,0.083851,0.086392,0.088481,0.090119,0.091304],
+[-0.021739,-0.017787,-0.013552,-0.0090344,-0.0042349,0.00084698,0.0062112,0.011858,0.017787,0.023998,0.030491,0.037267,0.044325,0.051666,0.059289,0.067194,0.075381,0.083851,0.092603,0.10164,0.11095,0.12055,0.13043],
+[-1.3878e-17,-0.0039526,-0.0067758,-0.0084698,-0.0090344,-0.0084698,-0.0067758,-0.0039526,-2.0817e-17,0.0050819,0.011293,0.018634,0.027103,0.036702,0.047431,0.059289,0.072276,0.086392,0.10164,0.11801,0.13552,0.15415,0.17391],
+[0.026087,0.013043,0.0020892,-0.0067758,-0.013552,-0.018238,-0.020836,-0.021344,-0.019763,-0.016093,-0.010333,-0.0024845,0.0074534,0.019481,0.033597,0.049802,0.068097,0.088481,0.11095,0.13552,0.16217,0.19091,0.22174],
+[0.056522,0.033202,0.013043,-0.0039526,-0.017787,-0.028458,-0.035968,-0.040316,-0.041502,-0.039526,-0.034387,-0.026087,-0.014625,-3.0358e-17,0.017787,0.038735,0.062846,0.090119,0.12055,0.15415,0.19091,0.23083,0.27391],
+[0.091304,0.056522,0.026087,8.3267e-17,-0.021739,-0.03913,-0.052174,-0.06087,-0.065217,-0.065217,-0.06087,-0.052174,-0.03913,-0.021739,-5.5511e-17,0.026087,0.056522,0.091304,0.13043,0.17391,0.22174,0.27391,0.33043]];
+const SP_TH_VALUE1 = -1;            // saturation threshold, in units of sigma(dI)
+const SP_VALIDITY_THRESHOLD = 0.1;  // residual/signal std ratio below which a trace is valid
+
+function stdev(a) {
+  const n = a.length; if (n < 2) return 0;
+  const m = a.reduce((s, x) => s + x, 0) / n;
+  return Math.sqrt(a.reduce((s, x) => s + (x - m) * (x - m), 0) / (n - 1));
+}
+
+/* SP_ClipSaturation: walk back over the right half, cut at the last abrupt
+   drop that still sits above the running maximum seen from the right. */
+function clipSaturation(d) {
+  const N = d.length; if (N < 4) return N;
+  const dI = []; for (let i = 1; i <= N - 1; i++) dI.push(d[i][1] - d[i - 1][1]);
+  let maxI = Math.min.apply(null, d.map(p => p[1])) - 1;
+  const th = SP_TH_VALUE1 * stdev(dI);
+  let lastGood = N;
+  for (let i = 1; i <= Math.round(N / 2); i++) {
+    const k = N - i;
+    if (dI[k - 1] < th && maxI < d[k - 1][1]) lastGood = N - i - 1;
+    if (maxI < d[k - 1][1]) maxI = d[k - 1][1];
+  }
+  let n = lastGood;
+  if (n > 1 && d[n - 1][1] < d[n - 2][1]) n--;
+  return Math.max(2, n);
+}
+
+/* SP_SGOLAY: window 23, Fluika's own convolution matrix, dedicated edge columns. */
+function sgolayFilter(y) {
+  const N = y.length; if (N < 23) return y.slice();
+  const out = new Array(N);
+  for (let i = 1; i <= 11; i++) {
+    let a = 0, b = 0;
+    for (let j = 1; j <= 23; j++) {
+      a += SGOLAY[j - 1][i - 1] * y[j - 1];
+      b += SGOLAY[j - 1][23 - i] * y[N - 23 + j - 1];
+    }
+    out[i - 1] = a; out[N - i] = b;
+  }
+  for (let i = 12; i <= N - 11; i++) {
+    let sum = 0;
+    for (let j = 1; j <= 23; j++) sum += y[i + 12 - j - 1] * SGOLAY[j - 1][11];
+    out[i - 1] = sum;
+  }
+  return out;
+}
+
+/* SP_BaselineCorrection, minus the decimation: greatest convex minorant. */
+function baselineOf(y) {
+  const n = y.length, st = [];
+  for (let i = 0; i < n; i++) {
+    while (st.length >= 2) {
+      const a = st[st.length - 2], b = st[st.length - 1];
+      if ((y[b] - y[a]) * (i - b) >= (y[i] - y[b]) * (b - a)) st.pop(); else break;
+    }
+    st.push(i);
+  }
+  const out = new Array(n);
+  for (let k = 0; k < st.length - 1; k++) {
+    const a = st[k], b = st[k + 1];
+    for (let i = a; i <= b; i++) out[i] = y[a] + (y[b] - y[a]) * (i - a) / (b - a);
+  }
+  out[n - 1] = y[st[st.length - 1]];
+  return out;
+}
+
+/* SP_PeakAnalyzer: alternating extrema, then pruning, then half-height width
+   and trapezoid area between the two flanking minima.
+   opt.mode = 'relative': a valley must sit below opt.f x the lower flanking peak.
+   opt.mode = 'absolute': a peak needs prominence >= opt.absT (µA), where
+                          prominence = its height - the higher of its two valleys. */
+function peakAnalyzer(bc, opt) {
+  const n = bc.length; if (n < 5) return [];
+  const isP = [], V2 = [], I2 = [];
+  const push = (t, v, i) => { isP.push(t); V2.push(v); I2.push(i); };
+  push(-1, bc[0][0], bc[0][1]);
+  for (let i = 1; i < n - 1; i++) {
+    if (bc[i][1] > bc[i - 1][1] && bc[i][1] >= bc[i + 1][1]) push(1, bc[i][0], bc[i][1]);
+    if (bc[i][1] < bc[i - 1][1] && bc[i][1] <= bc[i + 1][1]) push(-1, bc[i][0], bc[i][1]);
+  }
+  push(-1, bc[n - 1][0], bc[n - 1][1]);
+  const drop = i => { isP.splice(i, 1); V2.splice(i, 1); I2.splice(i, 1); };
+
+  if (opt.mode !== 'relative') {
+    for (let guard = 0; guard < 100000; guard++) {
+      let worst = -1, wp = Infinity;
+      for (let i = 1; i < isP.length - 1; i++) {
+        if (isP[i] !== 1) continue;
+        const pr = I2[i] - Math.max(I2[i - 1], I2[i + 1]);
+        if (pr < opt.absT && pr < wp) { wp = pr; worst = i; }
+      }
+      if (worst < 0) break;
+      // Remove the weak peak and its higher flanking valley (keeps max/min alternating).
+      const cand = [worst - 1, worst + 1].filter(j => j > 0 && j < isP.length - 1);
+      if (!cand.length) break;
+      const rmMin = cand.reduce((a, b) => (I2[a] > I2[b] ? a : b));
+      [worst, rmMin].sort((a, b) => b - a).forEach(drop);
+    }
+  }
+  if (opt.mode !== 'absolute') {
+    let keep = true, guard = 0;
+    while (keep && guard++ < 200000) {
+      keep = false;
+      for (let i = 0; i < isP.length - 2; i++) {
+        if (isP[i] === 1 && isP[i + 1] === -1 && isP[i + 2] === 1) {
+          if (!(opt.f * I2[i + 2] > I2[i + 1] && opt.f * I2[i] > I2[i + 1])) {
+            drop(I2[i] > I2[i + 2] ? i + 2 : i);
+            keep = true; break;
+          }
+        }
+      }
+      if (keep) continue;
+      for (let i = 0; i < isP.length - 1; i++) {
+        if (isP[i] === -1 && isP[i + 1] === -1) {
+          drop(I2[i] > I2[i + 1] ? i : i + 1);
+          keep = true; break;
+        }
+      }
+    }
+  }
+
+  const peaks = [];
+  for (let i = 1; i < isP.length - 1; i++) {
+    if (isP[i] !== 1) continue;
+    let Vs = bc[Math.min(i, n - 1)][0], Ve = bc[n - 1][0];
+    const half = 0.5 * I2[i];
+    for (let j = 1; j <= n; j++) {
+      if (bc[j - 1][1] < half && bc[j - 1][0] < V2[i]) Vs = bc[j - 1][0];
+      const k = n - j;
+      if (bc[k][1] < half && bc[k][0] > V2[i]) Ve = bc[k][0];
+    }
+    let Vmin, Vmax;
+    if (V2[i - 1] > V2[i + 1]) { Vmin = V2[i + 1]; Vmax = V2[i - 1]; }
+    else { Vmin = V2[i - 1]; Vmax = V2[i + 1]; }
+    Ve = Math.min(Math.max(Ve, Vmin), Vmax);
+    Vs = Math.min(Math.max(Vs, Vmin), Vmax);
+    let area = 0;
+    for (let j = 0; j < n - 1; j++) {
+      if (bc[j][0] >= Vmin && bc[j][0] < Vmax && bc[j + 1][0] >= Vmin && bc[j + 1][0] < Vmax)
+        area += (bc[j + 1][0] - bc[j][0]) * (bc[j + 1][1] + bc[j][1]) / 2;
+    }
+    peaks.push({
+      E: V2[i], height: I2[i], area: Math.abs(area),
+      fwhm: Ve - Vs, wbase: Vmax - Vmin,
+      vs: Vs, ve: Ve, vmin: Vmin, vmax: Vmax
+    });
+  }
+  return peaks;
+}
+
+/* NOVA "moving average" baseline (manual p.31): group the points in segments of
+   n, average each segment, then repeatedly pull each average down (positive
+   sweep) or up (negative sweep) to the mean of its two neighbours, for at most
+   maxIter passes or until nothing changes. The baseline is then interpolated
+   back to the original points. Assumptions where the manual is silent: a
+   shorter last segment is averaged on its own points, interpolation is linear
+   between segment centres, and the baseline is flat beyond the first and last. */
+function novaBaseline(y, n, positive, maxIter) {
+  const m = y.length;
+  const cx = [], A = [];
+  for (let s = 0; s < m; s += n) {
+    const e = Math.min(m, s + n);
+    let sx = 0, sy = 0;
+    for (let i = s; i < e; i++) { sx += i; sy += y[i]; }
+    cx.push(sx / (e - s)); A.push(sy / (e - s));
+  }
+  const K = A.length;
+  for (let it = 0; it < maxIter; it++) {
+    let changed = false;
+    for (let i = 1; i < K - 1; i++) {
+      const nb = (A[i - 1] + A[i + 1]) / 2;
+      if (positive ? A[i] > nb : A[i] < nb) { A[i] = nb; changed = true; }
+    }
+    if (!changed) break;
+  }
+  const out = new Array(m);
+  let k = 0;
+  for (let i = 0; i < m; i++) {
+    if (K === 1 || i <= cx[0]) { out[i] = A[0]; continue; }
+    if (i >= cx[K - 1]) { out[i] = A[K - 1]; continue; }
+    while (k < K - 2 && i > cx[k + 1]) k++;
+    const t = (i - cx[k]) / (cx[k + 1] - cx[k]);
+    out[i] = A[k] + t * (A[k + 1] - A[k]);
+  }
+  return out;
+}
+
+/* Full pipeline: clip saturation -> SG (23 pts, order 2) -> baseline (NOVA
+   moving average or convex envelope) -> SG (23 pts, order 2) on the corrected
+   trace. The validity ratio compares the raw trace with its first smoothing. */
+function runTreatment(pairs, o) {
+  if (!pairs || pairs.length < 25) return null;
+  const nKeep = clipSaturation(pairs);
+  const kept = pairs.slice(0, nKeep);
+  const rawI = kept.map(p => p[1]);
+  const sm1 = sgolayFilter(rawI);
+  const resid = rawI.map((v, i) => v - sm1[i]);
+  const sRaw = stdev(rawI);
+  const ratio = sRaw > 0 ? stdev(resid) / sRaw : 1;
+  const base = o.baseMode === 'hull'
+    ? baselineOf(sm1)
+    : novaBaseline(sm1, o.n, o.positive, o.maxIter);
+  const sm2 = sgolayFilter(sm1.map((v, i) => v - base[i]));
+  return {
+    nInput: pairs.length, nKept: nKeep, clipped: pairs.length - nKeep,
+    smooth: kept.map((p, i) => [p[0], sm1[i]]),
+    baseline: kept.map((p, i) => [p[0], base[i]]),
+    treated: kept.map((p, i) => [p[0], sm2[i]]),
+    ratio: ratio, valid: ratio < SP_VALIDITY_THRESHOLD,
+    peaks: [], advanced: []
+  };
+}
+
+function selectPeaks(all, thr, vMin, vMax) {
+  return all.filter(p => p.height >= thr && p.E >= vMin && p.E <= vMax);
+}
+
+/* --- Google Drive via Apps Script ----------------------------------------- */
+/* The request is a CORS "simple request" (text/plain body, no custom headers)
+   so no preflight is issued. If the browser still blocks reading the reply,
+   we retry with no-cors: the write goes through but cannot be confirmed. */
+const drive = { get ready() { return !!(GAS_URL && GAS_TOKEN); } };
+
+function driveFolder(kind) {
+  return DRIVE_ROOT + '/' + (devName || 'SUWED') + '/' + today() + '/' + (kind || 'raw');
+}
+
+async function driveUpload(fileName, text, kind, unique, meta) {
+  kind = kind || 'raw';
+  meta = meta || {};
+  const device = meta.device || devName || 'SUWED';
+  const date = meta.date || today();
+  const payload = JSON.stringify({
+    token: GAS_TOKEN,
+    device: device,
+    date: date,
+    kind: kind,
+    subfolder: meta.sub || '',
+    /* unique=true: the script picks a free name and reports it (new raw only).
+       unique=false: replace in place under the exact name (all other files). */
+    unique: !!unique,
+    sample: measuredSample || '',
+    filename: fileName,
+    points: currentPairs().length,
+    content: text
+  });
+  try {
+    const r = await fetch(GAS_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: payload,
+      redirect: 'follow'
+    });
+    const j = await r.json();
+    if (!j.ok) throw new Error(j.error || 'script error');
+    return { confirmed: true, name: j.name || fileName,
+             path: j.path || DRIVE_ROOT + '/' + device + '/' + date + '/' + kind + '/' + (meta.sub ? meta.sub + '/' : '') + fileName };
+  } catch (e) {
+    // Opaque fallback: the POST is still delivered, the reply is unreadable.
+    await fetch(GAS_URL, {
+      method: 'POST', mode: 'no-cors',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: payload
+    });
+    log('Drive reply unreadable (' + e.message + ') — sent without confirmation', 'err');
+    return { confirmed: false, name: fileName,
+             path: DRIVE_ROOT + '/' + device + '/' + date + '/' + kind + '/' + (meta.sub ? meta.sub + '/' : '') + fileName };
+  }
+}
+
+async function driveTest() {
+  if (!drive.ready) return;
+  const b = $('btnOd'); b.disabled = true; b.textContent = 'Testing…';
+  try {
+    const r = await fetch(GAS_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ token: GAS_TOKEN, ping: true })
+    });
+    const j = await r.json();
+    if (j.ok) { $('odStatus').textContent = 'Connected. Drive account: ' + (j.account || 'unknown'); log('Drive test OK', 'ok'); }
+    else { $('odStatus').textContent = 'Script reachable but refused: ' + j.error; log('Drive test refused: ' + j.error, 'err'); }
+  } catch (e) {
+    $('odStatus').textContent = 'No readable reply. Writes may still work — run one real save to check the Drive folder.';
+    log('Drive test failed: ' + e.message, 'err');
+  }
+  b.disabled = false; b.textContent = 'Test connection';
+}
+
+function renderOd() {
+  $('odPath').textContent = driveFolder('{raw|treated|peaks}') + '/<file>.txt';
+  const el = $('odStatus'), b = $('btnOd');
+  if (!drive.ready) {
+    el.textContent = 'Not configured. Set GAS_URL and GAS_TOKEN at the top of the source.';
+    b.disabled = true;
+  } else {
+    el.textContent = 'Configured. Use Test connection to check the endpoint.';
+    b.disabled = false;
+  }
+}
+
+/* --- Save dialog ---------------------------------------------------------- */
+const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+              (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
+let run = null;          // current run: live measurement or imported raw file
+let pendingPlan = null;
+
+/* --- Runs ------------------------------------------------------------------
+   A run is what the app works on: a live measurement, or a raw file imported
+   from this device. Writes always go to the run's own location (its measurement
+   date), never to today's folder by default. */
+function newMeasureRun() {
+  run = { source: 'measure', device: devName || 'SUWED', date: today(), name: '',
+          drive: true, positive: cfg.V_end > cfg.V_start, pairs: null, sample: measuredSample };
+}
+function currentPairs() {
+  if (run && run.source === 'import') return run.pairs;
+  return swvPairs();
+}
+
+/* Shared by local and Drive imports. */
+function setImportRun(o) {
+  if (o.pairs.length < 25) { log('Import: not enough numeric points in ' + o.name, 'err'); return false; }
+  const stem = sanitize(o.name.replace(/\.txt$/i, ''));
+  run = { source: 'import', origin: o.origin, device: o.device, date: o.date, sub: o.sub,
+          name: o.origin === 'drive' ? o.name : '', drive: o.drive,
+          positive: o.pairs[o.pairs.length - 1][0] > o.pairs[0][0],
+          pairs: o.pairs, sample: stem };
+  measuredSample = stem;
+  $('sampleName').value = stem;
+  $('fname').value = o.origin === 'drive' ? stem : 'local import_' + stem;
+  resetTreatment();
+  runAndShowTreatment(true);
+  refreshButtons();
+  setStatus('Imported — ' + o.name, 'on');
+  return true;
+}
+
+async function importRawFile(file) {
+  if (cs.run) { log('Stop the measurement before importing', 'err'); return; }
+  const pairs = parseCurve(await file.text());
+  if (setImportRun({ origin: 'local', name: file.name, pairs: pairs, device: devName || 'SUWED',
+                     date: today(), sub: 'local import', drive: !!devName })) {
+    log('Imported ' + file.name + ' — ' + pairs.length + ' points' +
+        (devName ? ' (saves go to Drive under ' + devName + '/<today>/…/local import)'
+                 : ' (no sensor connected: saves stay on this device)'), 'ok');
+  }
+}
+
+/* --- Import from Drive ------------------------------------------------------
+   Lists the raw files of the connected sensor and loads one as the current run.
+   Its saves go back to its own measurement date, next to the original raw. */
+async function driveCall(body) {
+  const r = await fetch(GAS_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify(Object.assign({ token: GAS_TOKEN }, body)),
+    redirect: 'follow'
+  });
+  const j = await r.json();
+  if (!j.ok) throw new Error(j.error || 'refused');
+  return j;
+}
+function openDriveImport() {
+  if (!drive.ready) { log('Drive is not configured', 'err'); return; }
+  if (!devName) { log('Connect the sensor first: its name selects the Drive folder', 'err'); return; }
+  $('drvInfo').textContent = DRIVE_ROOT + '/' + devName + '/ — raw files only';
+  $('dlgDrive').showModal();
+  refreshDriveList();
+}
+async function refreshDriveList() {
+  const box = $('drvList');
+  box.innerHTML = '<p class="note">Loading…</p>';
+  try {
+    const j = await driveCall({ action: 'list', device: devName });
+    if (!j.files.length) { box.innerHTML = '<p class="note">No raw file for this sensor yet.</p>'; return; }
+    box.innerHTML = '';
+    j.files.forEach(f => {
+      const b = document.createElement('button');
+      b.className = 'small drvItem';
+      b.textContent = f.date + (f.sub ? '  ·  ' + f.sub : '') + '  ·  ' + f.name;
+      b.onclick = () => loadFromDrive(f);
+      box.appendChild(b);
+    });
+  } catch (e) {
+    box.innerHTML = '<p class="note">' + escapeHtml(e.message) + '</p>';
+    log('Drive list failed: ' + e.message, 'err');
+  }
+}
+async function loadFromDrive(f) {
+  if (cs.run) { log('Stop the measurement before importing', 'err'); return; }
+  try {
+    const j = await driveCall({ action: 'get', id: f.id, device: f.device });
+    const pairs = parseCurve(j.content);
+    $('dlgDrive').close();
+    if (setImportRun({ origin: 'drive', name: j.name, pairs: pairs, device: f.device,
+                       date: f.date, sub: f.sub, drive: true })) {
+      log('Loaded from Drive: ' + DRIVE_ROOT + '/' + f.device + '/' + f.date + '/raw/' +
+          (f.sub ? f.sub + '/' : '') + j.name + ' — saves replace its derived files after confirmation', 'ok');
+    }
+  } catch (e) { log('Drive load failed: ' + e.message, 'err'); }
+}
+
+/* --- Save plan -------------------------------------------------------------- */
+function planPath(r, kind, base) {
+  if (r.drive && drive.ready)
+    return DRIVE_ROOT + '/' + r.device + '/' + r.date + '/' + kind + '/' + (r.sub ? r.sub + '/' : '') + base + '.txt';
+  return 'download: ' + (kind === 'raw' ? base : base + '_' + kind) + '.txt';
+}
+
+function buildSavePlan(only) {
+  const pairs = currentPairs();
+  if (!pairs.length) return null;
+  const want = only || ['raw', 'treated', 'peaks', 'advanced'];
+  const none = !shownPeaks.length;
+  const r = run || { source: 'measure', device: devName || 'SUWED', date: today(), name: '', drive: true, sample: '' };
+  if (r.source === 'import' && r.origin !== 'drive') r.date = today();
+  const items = [];
+  const add = (kind, text, note) => items.push({ kind: kind, text: text, note: note || '' });
+  if (want.includes('raw') && !r.name) add('raw', rawText(), 'new file');
+  if (proc && want.includes('treated')) add('treated', treatedText(), '');
+  if (proc && want.includes('peaks'))
+    add('peaks', none ? 'no peaks detected\n' : peaksText(), none ? '0 peaks' : shownPeaks.length + ' peak(s)');
+  if (proc && want.includes('advanced'))
+    add('advanced', none ? 'no peaks detected\n' : advancedText(), none ? '0 peaks' : '');
+  if (!items.length) return null;
+  return { run: r, items: items, overwrite: !!r.name && !!r.drive };
+}
+
+function openSavePlan(plan) {
+  if (!plan) { log('Nothing to save yet', 'err'); return; }
+  pendingPlan = plan;
+  const r = plan.run;
+  const base = r.name ? r.name.replace(/\.txt$/, '') : (sanitize($('fname').value) || r.sample || 'mesure');
+  $('saveTitle').textContent = plan.overwrite ? 'Replace existing files?' : 'Save measurement';
+  $('fname').value = base;
+  $('fname').readOnly = !!r.name;
+  $('savePath').textContent = r.drive && drive.ready
+    ? 'Google Drive → ' + DRIVE_ROOT + '/' + r.device + '/' + r.date + '/'
+    : 'Local download only — this run has no Drive location';
+  $('planList').innerHTML = plan.items.map((it, i) =>
+    '<label class="cb"><input type="checkbox" id="pl' + i + '" checked><span>' +
+    escapeHtml(it.kind + ' → ' + planPath(r, it.kind, base)) +
+    (it.note ? ' (' + escapeHtml(it.note) + ')' : '') +
+    (plan.overwrite && it.kind !== 'raw' ? ' — replaces the existing file if present' : '') +
+    '</span></label>').join('');
+  $('btnDoSave').textContent = plan.overwrite ? 'Replace' : 'Save';
+  $('localCopy').checked = !(r.drive && drive.ready);
+  $('dlgSave').showModal();
+}
+
+async function executeSavePlan(plan) {
+  const r = plan.run;
+  const chosen = plan.items.filter((it, i) => { const el = $('pl' + i); return el && el.checked; });
+  $('dlgSave').close();
+  pendingPlan = null;
+  if (!chosen.length) { log('Nothing selected to save', 'err'); return; }
+
+  const useDrive = !!(r.drive && drive.ready);
+  const localWanted = $('localCopy').checked || !useDrive;
+  const base = r.name ? r.name.replace(/\.txt$/, '') : (sanitize($('fname').value) || r.sample || 'mesure');
+  let savedName = r.name || '';
+  setStatus('Saving…', 'busy');
+
+  if (useDrive) {
+    for (const it of chosen) {
+      // Only a new measurement's raw file asks Drive for a free name; every
+      // other file is written under the exact name the run already has.
+      const isNewRaw = it.kind === 'raw' && !r.name;
+      const name = savedName || (base + '.txt');
+      try {
+        const res = await driveUpload(name, it.text, it.kind, isNewRaw, { device: r.device, date: r.date, sub: r.sub });
+        if (isNewRaw && res.name) { savedName = res.name; r.name = res.name; }
+        log('Drive ' + it.kind + ': ' + res.path + (res.confirmed ? '' : ' (unconfirmed)'),
+            res.confirmed ? 'ok' : 'err');
+      } catch (e) { log('Drive ' + it.kind + ' failed: ' + e.message, 'err'); }
+    }
+  }
+  if (localWanted) {
+    const stem = (savedName || base + '.txt').replace(/\.txt$/, '');
+    for (const it of chosen)
+      await localSave(it.kind === 'raw' ? stem + '.txt' : stem + '_' + it.kind + '.txt', it.text);
+  }
+  refreshButtons();
+  setStatus((useDrive ? 'Saved to Drive — ' : 'Saved locally — ') + (savedName || base), 'on');
+}
+
+function savePeaksOnly() { openSavePlan(buildSavePlan(['peaks'])); }
+
+function anchorDownload(name, text) {
+  const url = URL.createObjectURL(new Blob([text], { type: 'text/plain' }));
+  const a = document.createElement('a');
+  a.href = url; a.download = name; a.rel = 'noopener';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+}
+
+/* Android / desktop: direct download into the Downloads folder — the share
+   sheet there offers apps, not storage. iOS: share sheet → "Save to Files",
+   because the download attribute is unreliable inside WKWebView. */
+async function localSave(name, text) {
+  if (!isIOS) { anchorDownload(name, text); return 'downloaded'; }
+  const file = new File([text], name, { type: 'text/plain' });
+  if (navigator.canShare && navigator.canShare({ files: [file] })) {
+    try { await navigator.share({ files: [file], title: name }); return 'shared'; }
+    catch (e) { if (e.name === 'AbortError') return 'cancelled'; }
+  }
+  anchorDownload(name, text);
+  return 'downloaded';
+}
+
+async function shareOut(name, text) {
+  const file = new File([text], name, { type: 'text/plain' });
+  if (navigator.canShare && navigator.canShare({ files: [file] })) {
+    try { await navigator.share({ files: [file], title: name }); }
+    catch (e) { if (e.name !== 'AbortError') log('Share failed: ' + e.message, 'err'); }
+  } else { anchorDownload(name, text); }
+}
+
+function currentName() { return (sanitize($('fname').value) || 'mesure') + '.txt'; }
+
+/* --- Peak extraction and presentation ------------------------------------- */
+function treatOpts() {
+  return {
+    baseMode: $('baseMode').value,
+    n: Math.max(1, Math.round(num('maWin', 1))),
+    maxIter: Math.max(1, Math.round(num('maIter', 1000))),
+    positive: run ? run.positive : cfg.V_end > cfg.V_start
+  };
+}
+function pkOpts() {
+  return { mode: $('pkMode').value, f: num('pkProm', 0.98), absT: num('pkAbs', 0.02) };
+}
+function computeProc(pairs) {
+  const p = runTreatment(pairs, treatOpts());
+  if (p) p.peaks = peakAnalyzer(p.treated, pkOpts());
+  return p;
+}
+function ovProc(o) {
+  if (!o.proc) {
+    o.proc = runTreatment(o.data, treatOpts());
+    if (o.proc) o.proc.peaks = peakAnalyzer(o.proc.treated, pkOpts());
+  }
+  return o.proc;
+}
+function invalidateOverlays() { overlays.forEach(o => { o.proc = null; }); }
+
+/* Advanced = flat zero plus one Gaussian per shown peak: centre = Epeak,
+   height = height, sigma = FWHM / 2.3548, truncated to the integration bounds. */
+function advancedCurve() {
+  if (!proc) return [];
+  const g = shownPeaks.filter(p => p.fwhm > 0).map(p => ({
+    E: p.E, h: p.height, s: p.fwhm / 2.3548, a: p.vmin, b: p.vmax
+  }));
+  return proc.treated.map(q => {
+    let y = 0;
+    for (const p of g) {
+      if (q[0] >= p.a && q[0] <= p.b)
+        y += p.h * Math.exp(-((q[0] - p.E) * (q[0] - p.E)) / (2 * p.s * p.s));
+    }
+    return [q[0], y];
+  });
+}
+
+function runAndShowTreatment(auto) {
+  proc = computeProc(currentPairs());
+  if (!proc) { log('Not enough points to run the treatment', 'err'); return; }
+  invalidateOverlays();
+  $('segTreated').disabled = false;
+  $('segAdv').disabled = false;
+  integratePeaks(true);
+  if (auto) setView('treated');
+  log('Treatment: ' + proc.clipped + ' point(s) clipped, validity ratio ' +
+      proc.ratio.toFixed(4) + ' -> ' + (proc.valid ? 'valid' : 'faulty'),
+      proc.valid ? 'ok' : 'err');
+}
+function rebuildTreatment() { if (proc) runAndShowTreatment(false); }
+
+function integratePeaks(silent) {
+  if (!proc) return;
+  shownPeaks = selectPeaks(proc.peaks, num('pkTh', 0),
+                           num('pkMin', cfg.V_start), num('pkMax', cfg.V_end));
+  proc.advanced = advancedCurve();
+  selPeak = -1;
+  renderPeaks(); renderScores(); draw();
+  if (!silent) log('Integration: ' + shownPeaks.length + ' peak(s) retained', 'ok');
+}
+function recomputePeaks() {
+  if (!proc) return;
+  invalidateOverlays();
+  proc.peaks = peakAnalyzer(proc.treated, pkOpts());
+  integratePeaks(true);
+}
+
+/* --- Score calculation ---------------------------------------------------- */
+function zonesDef() {
+  const z = [];
+  for (let k = 1; k <= 3; k++) {
+    const a = parseFloat(($('z' + k + 'a').value || '').replace(',', '.'));
+    const b = parseFloat(($('z' + k + 'b').value || '').replace(',', '.'));
+    if (Number.isFinite(a) && Number.isFinite(b)) z.push({ k: k, lo: Math.min(a, b), hi: Math.max(a, b) });
+  }
+  return z;
+}
+function scoreOf(peaks, zn) {
+  const thr = num('pkTh', 0);
+  return peaks.filter(p => p.E >= zn.lo && p.E <= zn.hi && p.height >= thr)
+              .reduce((s, p) => s + p.area, 0) * 100;
+}
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+function renderScores() {
+  const el = $('scoreChart');
+  if (!el) return;
+  if (!proc) { el.innerHTML = '<p class="note">Run a measurement or Integrate first.</p>'; return; }
+  const zs = zonesDef();
+  if (!zs.length) { el.innerHTML = '<p class="note">Enter at least one zone (from / to, in V).</p>'; return; }
+  const curves = [{ name: 'current', color: '#7be38c', peaks: proc.peaks }];
+  overlays.forEach(o => {
+    const op = ovProc(o);
+    curves.push({ name: o.name, color: o.color, peaks: op ? op.peaks : [] });
+  });
+  let html = '';
+  zs.forEach(zn => {
+    const vals = curves.map(c => ({ name: c.name, color: c.color, v: scoreOf(c.peaks, zn) }));
+    const max = Math.max.apply(null, vals.map(x => x.v).concat([1e-12]));
+    html += '<div class="zone"><div class="ztitle">Zone ' + zn.k + ' · ' +
+            zn.lo.toFixed(2) + ' → ' + zn.hi.toFixed(2) + ' V</div><div class="bars">';
+    vals.forEach(x => {
+      const pct = Math.max(2, x.v / max * 100);
+      html += '<div class="bar" style="height:' + pct.toFixed(1) + '%;background:' + x.color +
+              '"><span class="bv">' + x.v.toFixed(2) + '</span></div>';
+    });
+    html += '</div><div class="blabels">' +
+            vals.map(x => '<span>' + escapeHtml(x.name.slice(0, 14)) + '</span>').join('') +
+            '</div></div>';
+  });
+  el.innerHTML = html;
+}
+
+function renderPeaks() {
+  const v = $('validity');
+  if (proc) {
+    v.innerHTML = 'Signal <span class="' + (proc.valid ? 'ok-tag' : 'bad-tag') + '">' +
+      (proc.valid ? 'valid' : 'faulty') + '</span> — residual/signal ratio ' +
+      proc.ratio.toFixed(3) + ' (threshold ' + SP_VALIDITY_THRESHOLD + '), ' +
+      proc.clipped + ' point(s) clipped as saturation.';
+  } else v.textContent = '';
+
+  const t = $('peakTable');
+  if (!shownPeaks.length) {
+    t.innerHTML = proc ? '<p class="note">No peak above the threshold in this range.</p>' : '';
+    $('btnSavePeaks').disabled = true;
+    return;
+  }
+  let html = '<table class="peaks"><tr><th>#</th><th>Epeak (V)</th><th>Area (µA·V)</th>' +
+             '<th>Height (µA)</th><th>FWHM (V)</th><th>Wbase (V)</th></tr>';
+  shownPeaks.forEach((p, i) => {
+    html += '<tr data-i="' + i + '"' + (i === selPeak ? ' class="sel"' : '') + '><td>' + (i + 1) +
+      '</td><td>' + p.E.toFixed(3) + '</td><td>' + p.area.toPrecision(4) +
+      '</td><td>' + p.height.toPrecision(4) + '</td><td>' + p.fwhm.toFixed(4) +
+      '</td><td>' + p.wbase.toFixed(4) + '</td></tr>';
+  });
+  t.innerHTML = html + '</table>';
+  t.querySelectorAll('tr[data-i]').forEach(tr => tr.onclick = () => {
+    const i = +tr.dataset.i;
+    selPeak = (selPeak === i) ? -1 : i;
+    renderPeaks(); setView('treated'); draw();
+  });
+  $('btnSavePeaks').disabled = false;
+}
+
+function setView(v) {
+  if ((v === 'treated' || v === 'advanced') && !proc) return;
+  viewMode = v;
+  $('segRaw').classList.toggle('active', v === 'raw');
+  $('segTreated').classList.toggle('active', v === 'treated');
+  $('segAdv').classList.toggle('active', v === 'advanced');
+  draw();
+}
+
+/* --- Overlays -------------------------------------------------------------- */
+function parseCurve(text) {
+  const out = [];
+  text.split(/\r?\n/).forEach(l => {
+    l = l.trim();
+    if (!l || l[0] === '#') return;
+    const c = l.split(/[\s,;]+/).map(Number);
+    if (c.length >= 2 && Number.isFinite(c[0]) && Number.isFinite(c[1])) out.push([c[0], c[1]]);
+  });
+  return out;
+}
+async function loadOverlays(files) {
+  for (const f of Array.from(files).slice(0, 10 - overlays.length)) {
+    try {
+      const d = parseCurve(await f.text());
+      if (d.length > 1) overlays.push({
+        name: f.name, data: d, color: OV_COLORS[overlays.length % OV_COLORS.length], proc: null
+      });
+      else log('No numeric data in ' + f.name, 'err');
+    } catch (e) { log('Cannot read ' + f.name + ': ' + e.message, 'err'); }
+  }
+  renderOverlays(); renderScores(); draw();
+}
+
+function renderOverlays() {
+  $('ovList').innerHTML = overlays.length
+    ? overlays.map(o => '<span style="color:' + o.color + '">■</span> ' + o.name).join('<br>')
+    : '';
+}
+
+/* --- Stop ----------------------------------------------------------------- */
+/* Halts acquisition on this side and keeps whatever was collected. The Fluika
+   command set has no documented abort, so the sensor may finish its sweep on
+   its own; use Switch off to cut it short. [TO CONFIRM with Fluika] */
+function stopMeasurement() {
+  if (comMODE !== 1 || stopped) return;
+  stopped = true;
+  sendToUWED('N()');   // halt the sensor, as the Fluika app does
+  cs.run = 0;
+  clearWatchdog();
+  $('btnStop').disabled = true;
+  log('Stopped by user at ' + pairCount() + ' points — sensor may still be sweeping', 'err');
+  setStatus('Stopped — ' + pairCount() + ' points', 'on');
+  if ($('applyTreatment').checked) runAndShowTreatment(true);
+  refreshButtons();
+  if (currentPairs().length > 0) openSavePlan(buildSavePlan());
+}
+
+/* --- UI wiring ------------------------------------------------------------ */
+function resetTreatment() {
+  proc = null; shownPeaks = []; selPeak = -1;
+  $('segTreated').disabled = true;
+  $('segAdv').disabled = true;
+  setView('raw'); renderPeaks(); renderScores();
+}
+
+function refreshButtons() {
+  const has = currentPairs().length > 0;
+  $('btnImportLocal').disabled = !!cs.run;
+  $('btnImportDrive').disabled = !!cs.run || !drive.ready || !devName;
+  $('btnExport').disabled = !has;
+  $('btnClear').disabled = !has;
+  $('btnIntegrate').disabled = !has;
+  $('btnSavePeaks').disabled = !shownPeaks.length;
+}
+$('btnConnect').onclick = async () => {
+  if (gatt && gatt.connected) { userDisconnect = true; gatt.disconnect(); enable(false); return; }
+  await connect();
+};
+$('btnInit').onclick   = () => { log('— Initialize: reading registers —'); readRegisters(); };
+$('btnStart').onclick  = () => { log('— Starting measurement —'); initializeUWED(); refreshButtons(); };
+$('btnStop').onclick   = stopMeasurement;
+$('btnOff').onclick    = () => { setStatus('Switching off', 'busy'); sendToUWED('Q()'); };
+$('btnClear').onclick  = () => { pts = []; lastIndex = -1; run = null; resetTreatment(); draw(); refreshButtons(); };
+$('btnExport').onclick = () => openSavePlan(buildSavePlan());
+$('btnClearLog').onclick = () => { $('log').textContent = ''; };
+$('segRaw').onclick = () => setView('raw');
+$('segTreated').onclick = () => setView('treated');
+$('btnIntegrate').onclick = () => {
+  if (!proc) runAndShowTreatment(true); else integratePeaks(false);
+  setView('treated');
+};
+$('btnSavePeaks').onclick = savePeaksOnly;
+$('ovFile').onchange = e => { loadOverlays(e.target.files); e.target.value = ''; };
+$('btnClearOv').onclick = () => { overlays = []; renderOverlays(); renderScores(); draw(); };
+['pkTh', 'pkMin', 'pkMax'].forEach(id =>
+  $(id).addEventListener('change', () => { if (proc) integratePeaks(true); }));
+['pkMode', 'pkProm', 'pkAbs'].forEach(id =>
+  $(id).addEventListener('change', recomputePeaks));
+['baseMode', 'maWin', 'maIter'].forEach(id =>
+  $(id).addEventListener('change', rebuildTreatment));
+['z1a', 'z1b', 'z2a', 'z2b', 'z3a', 'z3b'].forEach(id =>
+  $(id).addEventListener('change', renderScores));
+$('segAdv').onclick = () => setView('advanced');
+
+$('btnCancelSave').onclick = () => $('dlgSave').close();
+$('btnDoSave').onclick = () => { if (pendingPlan) executeSavePlan(pendingPlan); };
+$('btnImportLocal').onclick = () => $('importFile').click();
+$('importFile').onchange = e => { const f = e.target.files[0]; e.target.value = ''; if (f) importRawFile(f); };
+$('btnImportDrive').onclick = openDriveImport;
+$('btnDrvRefresh').onclick = refreshDriveList;
+$('btnDrvClose').onclick = () => $('dlgDrive').close();
+$('btnShare').onclick = () => shareOut(currentName(), exportText());
+$('btnOd').onclick = driveTest;
+$('sampleName').addEventListener('input', draw);
+['V_start','V_end','freq','V_step','V_amp','t_wait','GAIN','ShutDownTime']
+  .forEach(id => $(id).addEventListener('change', () => { readConfig(); draw(); }));
+$('V_start').addEventListener('change', () => { $('pkMin').value = $('V_start').value; });
+$('V_end').addEventListener('change', () => { $('pkMax').value = $('V_end').value; });
+
+window.addEventListener('resize', sizeCanvas);
+readConfig();
+sizeCanvas();
+refreshButtons();
+renderPeaks();
+renderScores();
+renderOd();
+if (!navigator.bluetooth) {
+  setStatus('Web Bluetooth unavailable — open in Bluefy', 'busy');
+  log('navigator.bluetooth missing. Safari on iPadOS does not expose Web Bluetooth.', 'err');
+}
+</script>
+</body>
+</html>
