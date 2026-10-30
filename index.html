@@ -119,12 +119,15 @@
   .ok-tag{color:var(--trace)} .bad-tag{color:var(--bad)}
   .zone{margin-top:16px}
   .ztitle{font-size:13px;color:var(--ink-dim);margin-bottom:6px}
-  .bars{display:flex;align-items:flex-end;gap:8px;height:140px;padding-top:20px;border-bottom:1px solid var(--line)}
-  .bar{flex:1;position:relative;border-radius:4px 4px 0 0;min-width:10px}
+  .bars{display:flex;align-items:flex-end;height:140px;padding-top:20px;border-bottom:1px solid var(--line);overflow-x:auto}
+  .grid6{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px}
+  .grid6 label{font-size:12px}
+  .grid6 input{padding:0 6px}
+  .bar{flex:0 0 10%;margin:0 2px;box-sizing:border-box;position:relative;border-radius:4px 4px 0 0}
   .bv{position:absolute;left:-8px;right:-8px;top:-18px;text-align:center;font-size:11px;white-space:nowrap;
       font-family:ui-monospace,"SF Mono",Menlo,monospace;color:var(--ink)}
-  .blabels{display:flex;gap:8px;margin-top:4px;font-size:11px;color:var(--ink-dim)}
-  .blabels span{flex:1;min-width:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:center}
+  .blabels{display:flex;margin-top:4px;font-size:11px;color:var(--ink-dim);overflow-x:auto}
+  .blabels span{flex:0 0 10%;margin:0 2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:center}
   #planList .cb{margin-top:8px}
   .drvItem{width:100%;margin:6px 0;text-align:left;min-height:48px;font-size:14px;font-weight:500;display:block}
   dialog{
@@ -139,13 +142,12 @@
 
 <header>
   <h1>Skin-Biosense</h1>
-  <span class="ver mono">version 5.3.2</span>
+  <span class="ver mono">version 5.3.3</span>
 </header>
 
 <div class="status">
   <span class="dot" id="dot"></span>
   <span id="statusText">Not connected</span>
-  <span id="batText" class="mono" style="color:var(--ink-dim);font-size:13px;white-space:nowrap"></span>
 </div>
 
 <div class="sample">
@@ -238,7 +240,7 @@
 <details>
   <summary>Score calculation</summary>
   <div class="body">
-    <div class="grid">
+    <div class="grid6">
       <div><label for="z1a">Zone 1 from (V)</label><input id="z1a" type="text" inputmode="decimal"></div>
       <div><label for="z1b">Zone 1 to (V)</label><input id="z1b" type="text" inputmode="decimal"></div>
       <div><label for="z2a">Zone 2 from (V)</label><input id="z2a" type="text" inputmode="decimal"></div>
@@ -309,7 +311,7 @@
 <script>
 "use strict";
 /* ============================================================================
-   Skin-Biosense v5.3.2
+   Skin-Biosense v5.3.3
    Port of the techBASIC "SUWED" program (Fluika OÜ) to Web Bluetooth.
    Runs in any browser exposing navigator.bluetooth — Bluefy / WebBLE on iPadOS,
    Chrome / Edge on Android. Deviations from the .bas are marked [DIFF].
@@ -423,7 +425,7 @@ async function connect() {
     setStatus('Looking for a device…', 'busy');
     dev = await navigator.bluetooth.requestDevice({
       filters: [{ namePrefix: 'SUWED' }],
-      optionalServices: [NUS_SERVICE, 'battery_service']
+      optionalServices: [NUS_SERVICE]
     });
     devName = dev.name || 'SUWED';
     dev.addEventListener('gattserverdisconnected', onDisconnected);
@@ -442,15 +444,10 @@ async function openGatt() {
   chNotify.addEventListener('characteristicvaluechanged', onNotify);
   await chNotify.startNotifications();
   log('Connected to ' + devName, 'ok');
-  batUnsupported = false;
-  readBattery();
-  startBatteryWatch();
   setStatus(devName + ' connected', 'on');
   enable(true); renderOd();
 }
 function onDisconnected() {
-  $('batText').textContent = '';
-  if (batTimer) { clearInterval(batTimer); batTimer = null; }
   enable(false); clearWatchdog(); cs.run = 0;
   if (userDisconnect) { userDisconnect = false; setStatus('Disconnected'); return; }
   setStatus('Connection lost — reconnecting…', 'busy');
@@ -465,33 +462,6 @@ function enable(on) {
   if (!on) $('btnStop').disabled = true;
   $('btnConnect').textContent = on ? 'Disconnect' : 'Connect';
   refreshButtons();   // Import from Drive depends on the connected sensor
-}
-
-/* --- Battery ---------------------------------------------------------------
-   Reads the standard Bluetooth Battery Service (0x180F / 0x2A19). The Fluika
-   command set has no battery command; if this sensor does not expose the
-   service, the indicator says so and the check stops. Reads are skipped while
-   a measurement runs, so they never interleave with the data stream. */
-let batTimer = null, batUnsupported = false;
-async function readBattery() {
-  if (!gatt || !gatt.connected || cs.run || batUnsupported) return;
-  try {
-    const svc = await gatt.getPrimaryService('battery_service');
-    const ch = await svc.getCharacteristic('battery_level');
-    const v = await ch.readValue();
-    const pct = v.getUint8(0);
-    $('batText').textContent = 'Battery ' + pct + '%';
-    log('Battery ' + pct + '%', 'ok');
-  } catch (e) {
-    batUnsupported = true;
-    if (batTimer) { clearInterval(batTimer); batTimer = null; }
-    $('batText').textContent = 'Battery n/a';
-    log('Battery: not exposed by this sensor (' + (e && e.name ? e.name : 'error') + ')', 'rx');
-  }
-}
-function startBatteryWatch() {
-  if (batTimer) clearInterval(batTimer);
-  batTimer = setInterval(() => { if (!cs.run) readBattery(); }, 60000);
 }
 
 /* --- Command transmission (sendToUWED) ------------------------------------ */
@@ -580,7 +550,6 @@ function csDone() {
     applyRegisters();
     setStatus(devName + ' — calibration loaded, ready', 'on');
     log('Calibration loaded', 'ok');
-    readBattery();
   }
   refreshButtons();
 }
@@ -749,9 +718,11 @@ function draw() {
   const m = { l: 64, r: 16, t: 16, b: 42 };
   ctx.clearRect(0, 0, w, h);
 
-  const isTr = viewMode === 'treated' && proc;
-  const isAdv = viewMode === 'advanced' && proc;
+  const isTr = viewMode === 'treated' && hasTreatedSource();
+  const isAdv = viewMode === 'advanced' && hasTreatedSource();
   const isView = isTr || isAdv;
+  const T = proc ? proc.treated : [];
+  const A = proc ? proc.advanced : [];
 
   // Treated and advanced views show the detection window only.
   let x0 = Math.min(cfg.V_start, cfg.V_end), x1 = Math.max(cfg.V_start, cfg.V_end);
@@ -765,10 +736,10 @@ function draw() {
   }
   const inWin = p => p[0] >= x0 && p[0] <= x1;
 
-  const main = isAdv ? proc.advanced : (isTr ? proc.treated : currentPairs());
+  const main = isAdv ? A : (isTr ? T : currentPairs());
   const ovs = overlays.map(o => {
     if (!isView) return o.data;
-    if (isAdv) return null;
+    if (isAdv) return ovAdvanced(o);
     const op = ovProc(o);
     return op ? op.treated : null;
   });
@@ -777,7 +748,7 @@ function draw() {
   const collect = d => { if (d) d.forEach(p => { if (inWin(p)) all.push(p[1]); }); };
   collect(main);
   ovs.forEach(collect);
-  if (isTr && proc) collect(proc.treated);
+  if (isView && proc) collect(T);
   if (!isView && proc) collect(proc.baseline);
   let y0 = -100, y1 = 100;
   if (all.length > 1) {
@@ -827,13 +798,14 @@ function draw() {
     ctx.stroke(); ctx.setLineDash([]);
   };
 
+  // Overlays first, in their own colours, solid lines in every view.
   ovs.forEach((d, i) => line(d, overlays[i].color, 1.5));
 
   if (isAdv) {
-    line(proc.advanced, '#c77dd6', 2, [6, 3]);
+    line(A, '#7be38c', 2);
   } else if (isTr) {
     shownPeaks.forEach((p, idx) => {
-      const seg = proc.treated.filter(q => q[0] >= p.vmin && q[0] <= p.vmax);
+      const seg = T.filter(q => q[0] >= p.vmin && q[0] <= p.vmax);
       if (seg.length > 1) {
         ctx.fillStyle = idx === selPeak ? 'rgba(123,227,140,.34)' : 'rgba(123,227,140,.15)';
         ctx.beginPath(); ctx.moveTo(X(seg[0][0]), Y(0));
@@ -853,7 +825,7 @@ function draw() {
       ctx.fillStyle = '#e6eef1';
       ctx.beginPath(); ctx.arc(X(p.E), Y(p.height), 3.5, 0, 6.2832); ctx.fill();
     });
-    line(proc.treated, '#7be38c', 2);
+    line(T, '#7be38c', 2);
   } else {
     const pairs = currentPairs();
     if (proc && proc.clipped > 0) line(pairs.slice(proc.nKept - 1), '#4a5b64', 2);
@@ -1472,19 +1444,115 @@ function invalidateOverlays() { overlays.forEach(o => { o.proc = null; }); }
 
 /* Advanced = flat zero plus one Gaussian per shown peak: centre = Epeak,
    height = height, sigma = FWHM / 2.3548, truncated to the integration bounds. */
-function advancedCurve() {
-  if (!proc) return [];
-  const g = shownPeaks.filter(p => p.fwhm > 0).map(p => ({
+
+/* Analysis works on the current graph and/or the overlays, independently. */
+function hasTreatedSource() { return !!proc || overlays.length > 0; }
+function currentLabel() {
+  const n = run && run.name ? run.name : (sanitize($('fname').value) || 'current');
+  return n.replace(/\.txt$/i, '');
+}
+function ovShown(o) {
+  const op = ovProc(o);
+  return op ? selectPeaks(op.peaks, num('pkTh', 0), num('pkMin', cfg.V_start), num('pkMax', cfg.V_end)) : [];
+}
+function ovAdvanced(o) {
+  const op = ovProc(o);
+  return op ? gaussianCurve(op.treated, ovShown(o)) : [];
+}
+function refreshAnalysis() {
+  if (proc) integratePeaks(true);
+  else { renderPeaks(); renderScores(); draw(); }
+}
+
+function renderPeaks() {
+  const v = $('validity');
+  if (proc) {
+    v.innerHTML = 'Signal <span class="' + (proc.valid ? 'ok-tag' : 'bad-tag') + '">' +
+      (proc.valid ? 'valid' : 'faulty') + '</span> — residual/signal ratio ' +
+      proc.ratio.toFixed(3) + ' (threshold ' + SP_VALIDITY_THRESHOLD + '), ' +
+      proc.clipped + ' point(s) clipped as saturation.';
+  } else v.textContent = '';
+
+  const rows = [];
+  if (proc) shownPeaks.forEach((p, i) => rows.push({ sample: currentLabel(), p: p, i: i, color: '#7be38c' }));
+  overlays.forEach(o => ovShown(o).forEach(p => rows.push({ sample: o.name.replace(/\.txt$/i, ''), p: p, i: -1, color: o.color })));
+
+  const t = $('peakTable');
+  $('btnSavePeaks').disabled = !(proc && shownPeaks.length);
+  if (!rows.length) {
+    t.innerHTML = (proc || overlays.length) ? '<p class="note">No peak above the threshold in this range.</p>' : '';
+    return;
+  }
+  const numbers = {};
+  let html = '<table class="peaks"><tr><th>Sample</th><th>#</th><th>Epeak (V)</th><th>Area (µA·V)</th>' +
+             '<th>Height (µA)</th><th>FWHM (V)</th><th>Wbase (V)</th></tr>';
+  rows.forEach(r => {
+    numbers[r.sample] = (numbers[r.sample] || 0) + 1;
+    html += '<tr' + (r.i >= 0 ? ' data-i="' + r.i + '"' : '') + (r.i === selPeak ? ' class="sel"' : '') + '>' +
+      '<td style="color:' + r.color + '">' + escapeHtml(r.sample) + '</td><td>' + numbers[r.sample] + '</td>' +
+      '<td>' + r.p.E.toFixed(3) + '</td><td>' + r.p.area.toPrecision(4) + '</td>' +
+      '<td>' + r.p.height.toPrecision(4) + '</td><td>' + r.p.fwhm.toFixed(4) + '</td>' +
+      '<td>' + r.p.wbase.toFixed(4) + '</td></tr>';
+  });
+  t.innerHTML = html + '</table>';
+  t.querySelectorAll('tr[data-i]').forEach(tr => tr.onclick = () => {
+    const i = +tr.dataset.i;
+    selPeak = (selPeak === i) ? -1 : i;
+    renderPeaks(); setView('treated'); draw();
+  });
+}
+
+function setView(v) {
+  if ((v === 'treated' || v === 'advanced') && !hasTreatedSource()) return;
+  viewMode = v;
+  $('segRaw').classList.toggle('active', v === 'raw');
+  $('segTreated').classList.toggle('active', v === 'treated');
+  $('segAdv').classList.toggle('active', v === 'advanced');
+  draw();
+}
+
+/* Gaussian model of a set of peaks on the treated grid. Each peak is tapered to
+   zero at its own integration bounds: the straight line joining its values at
+   both bounds is removed, so the peak ends instead of being cut. */
+function gaussianCurve(tr, peaks) {
+  const g = peaks.filter(p => p.fwhm > 0).map(p => ({
     E: p.E, h: p.height, s: p.fwhm / 2.3548, a: p.vmin, b: p.vmax
   }));
-  return proc.treated.map(q => {
+  return tr.map(q => {
     let y = 0;
     for (const p of g) {
-      if (q[0] >= p.a && q[0] <= p.b)
-        y += p.h * Math.exp(-((q[0] - p.E) * (q[0] - p.E)) / (2 * p.s * p.s));
+      if (q[0] < p.a || q[0] > p.b) continue;
+      const G = x => Math.exp(-((x - p.E) * (x - p.E)) / (2 * p.s * p.s));
+      const ga = G(p.a), gb = G(p.b);
+      const t = (q[0] - p.a) / ((p.b - p.a) || 1);
+      y += p.h * (G(q[0]) - (ga + (gb - ga) * t));
     }
     return [q[0], y];
   });
+}
+function advancedCurve() {
+  if (!proc) return [];
+  return gaussianCurve(proc.treated, shownPeaks);
+}
+
+function integratePeaks(silent) {
+  if (!proc) return;
+  shownPeaks = selectPeaks(proc.peaks, num('pkTh', 0),
+                           num('pkMin', cfg.V_start), num('pkMax', cfg.V_end));
+  proc.advanced = advancedCurve();
+  selPeak = -1;
+  renderPeaks(); renderScores(); draw();
+  if (!silent) log('Integration: ' + shownPeaks.length + ' peak(s) retained', 'ok');
+}
+function recomputePeaks() {
+  invalidateOverlays();
+  if (!proc) { refreshAnalysis(); return; }
+  proc.peaks = peakAnalyzer(proc.treated, pkOpts());
+  integratePeaks(true);
+}
+function rebuildTreatment() {
+  invalidateOverlays();
+  if (proc) runAndShowTreatment(false); else refreshAnalysis();
 }
 
 function runAndShowTreatment(auto) {
@@ -1498,23 +1566,6 @@ function runAndShowTreatment(auto) {
   log('Treatment: ' + proc.clipped + ' point(s) clipped, validity ratio ' +
       proc.ratio.toFixed(4) + ' -> ' + (proc.valid ? 'valid' : 'faulty'),
       proc.valid ? 'ok' : 'err');
-}
-function rebuildTreatment() { if (proc) runAndShowTreatment(false); }
-
-function integratePeaks(silent) {
-  if (!proc) return;
-  shownPeaks = selectPeaks(proc.peaks, num('pkTh', 0),
-                           num('pkMin', cfg.V_start), num('pkMax', cfg.V_end));
-  proc.advanced = advancedCurve();
-  selPeak = -1;
-  renderPeaks(); renderScores(); draw();
-  if (!silent) log('Integration: ' + shownPeaks.length + ' peak(s) retained', 'ok');
-}
-function recomputePeaks() {
-  if (!proc) return;
-  invalidateOverlays();
-  proc.peaks = peakAnalyzer(proc.treated, pkOpts());
-  integratePeaks(true);
 }
 
 /* --- Score calculation ---------------------------------------------------- */
@@ -1564,46 +1615,7 @@ function renderScores() {
   el.innerHTML = html;
 }
 
-function renderPeaks() {
-  const v = $('validity');
-  if (proc) {
-    v.innerHTML = 'Signal <span class="' + (proc.valid ? 'ok-tag' : 'bad-tag') + '">' +
-      (proc.valid ? 'valid' : 'faulty') + '</span> — residual/signal ratio ' +
-      proc.ratio.toFixed(3) + ' (threshold ' + SP_VALIDITY_THRESHOLD + '), ' +
-      proc.clipped + ' point(s) clipped as saturation.';
-  } else v.textContent = '';
 
-  const t = $('peakTable');
-  if (!shownPeaks.length) {
-    t.innerHTML = proc ? '<p class="note">No peak above the threshold in this range.</p>' : '';
-    $('btnSavePeaks').disabled = true;
-    return;
-  }
-  let html = '<table class="peaks"><tr><th>#</th><th>Epeak (V)</th><th>Area (µA·V)</th>' +
-             '<th>Height (µA)</th><th>FWHM (V)</th><th>Wbase (V)</th></tr>';
-  shownPeaks.forEach((p, i) => {
-    html += '<tr data-i="' + i + '"' + (i === selPeak ? ' class="sel"' : '') + '><td>' + (i + 1) +
-      '</td><td>' + p.E.toFixed(3) + '</td><td>' + p.area.toPrecision(4) +
-      '</td><td>' + p.height.toPrecision(4) + '</td><td>' + p.fwhm.toFixed(4) +
-      '</td><td>' + p.wbase.toFixed(4) + '</td></tr>';
-  });
-  t.innerHTML = html + '</table>';
-  t.querySelectorAll('tr[data-i]').forEach(tr => tr.onclick = () => {
-    const i = +tr.dataset.i;
-    selPeak = (selPeak === i) ? -1 : i;
-    renderPeaks(); setView('treated'); draw();
-  });
-  $('btnSavePeaks').disabled = false;
-}
-
-function setView(v) {
-  if ((v === 'treated' || v === 'advanced') && !proc) return;
-  viewMode = v;
-  $('segRaw').classList.toggle('active', v === 'raw');
-  $('segTreated').classList.toggle('active', v === 'treated');
-  $('segAdv').classList.toggle('active', v === 'advanced');
-  draw();
-}
 
 /* --- Overlays -------------------------------------------------------------- */
 function parseCurve(text) {
@@ -1626,7 +1638,7 @@ async function loadOverlays(files) {
       else log('No numeric data in ' + f.name, 'err');
     } catch (e) { log('Cannot read ' + f.name + ': ' + e.message, 'err'); }
   }
-  renderOverlays(); renderScores(); draw();
+  renderOverlays(); refreshAnalysis();
 }
 
 function renderOverlays() {
@@ -1667,8 +1679,8 @@ function refreshButtons() {
   $('btnImportDrive').disabled = !!cs.run || !drive.ready || !devName;
   $('btnExport').disabled = !has;
   $('btnClear').disabled = !has;
-  $('btnIntegrate').disabled = !has;
-  $('btnSavePeaks').disabled = !shownPeaks.length;
+  $('btnIntegrate').disabled = !(has || overlays.length > 0);
+  $('btnSavePeaks').disabled = !(proc && shownPeaks.length);
 }
 $('btnConnect').onclick = async () => {
   if (gatt && gatt.connected) { userDisconnect = true; gatt.disconnect(); enable(false); return; }
@@ -1684,14 +1696,15 @@ $('btnClearLog').onclick = () => { $('log').textContent = ''; };
 $('segRaw').onclick = () => setView('raw');
 $('segTreated').onclick = () => setView('treated');
 $('btnIntegrate').onclick = () => {
-  if (!proc) runAndShowTreatment(true); else integratePeaks(false);
+  if (currentPairs().length) { if (!proc) runAndShowTreatment(true); else integratePeaks(false); }
+  else refreshAnalysis();
   setView('treated');
 };
 $('btnSavePeaks').onclick = savePeaksOnly;
 $('ovFile').onchange = e => { loadOverlays(e.target.files); e.target.value = ''; };
-$('btnClearOv').onclick = () => { overlays = []; renderOverlays(); renderScores(); draw(); };
+$('btnClearOv').onclick = () => { overlays = []; renderOverlays(); refreshAnalysis(); };
 ['pkTh', 'pkMin', 'pkMax'].forEach(id =>
-  $(id).addEventListener('change', () => { if (proc) integratePeaks(true); }));
+  $(id).addEventListener('change', refreshAnalysis));
 ['pkMode', 'pkProm', 'pkAbs'].forEach(id =>
   $(id).addEventListener('change', recomputePeaks));
 ['baseMode', 'maWin', 'maIter'].forEach(id =>
