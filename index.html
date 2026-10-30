@@ -142,7 +142,7 @@
 
 <header>
   <h1>Skin-Biosense</h1>
-  <span class="ver mono">version 5.3.6</span>
+  <span class="ver mono">version 5.3.5</span>
 </header>
 
 <div class="status">
@@ -312,7 +312,7 @@
 <script>
 "use strict";
 /* ============================================================================
-   Skin-Biosense v5.3.6
+   Skin-Biosense v5.3.5
    Port of the techBASIC "SUWED" program (Fluika OÜ) to Web Bluetooth.
    Runs in any browser exposing navigator.bluetooth — Bluefy / WebBLE on iPadOS,
    Chrome / Edge on Android. Deviations from the .bas are marked [DIFF].
@@ -355,7 +355,7 @@ let regs = [], regsi = 0;
 let pts = [], lastIndex = -1;
 let watchdog = null, retries = 0;
 let measuredSample = '';
-let framesLost = 0, dupFrames = 0, stopped = false;
+let framesLost = 0, stopped = false;
 let lastSavedName = '';   // name Code.gs actually used for this run's raw file
 let proc = null;                 // result of runTreatment()
 let shownPeaks = [];             // peaks after threshold and range filtering
@@ -543,8 +543,7 @@ function csDone() {
     $('btnStop').disabled = true;
     const lost = framesLost ? ' — ' + framesLost + ' frames lost' : '';
     setStatus('Measurement complete — ' + pairCount() + ' points' + lost, lost ? 'busy' : 'on');
-    log('Measurement complete: ' + pairCount() + ' points, ' + framesLost + ' lost' +
-        (dupFrames ? ', ' + dupFrames + ' retried frame(s) ignored' : ''),
+    log('Measurement complete: ' + pairCount() + ' points, ' + framesLost + ' lost',
         framesLost ? 'err' : 'ok');
     if ($('applyTreatment').checked) runAndShowTreatment(true);
     openSavePlan(buildSavePlan());
@@ -594,7 +593,7 @@ function applyRegisters() {
 function initializeUWED() {
   readConfig();
   if (!calLoaded) log('Warning: Initialize not run — using default calibration', 'err');
-  pts = []; lastIndex = -1; framesLost = 0; dupFrames = 0; stopped = false; lastSavedName = '';
+  pts = []; lastIndex = -1; framesLost = 0; stopped = false; lastSavedName = '';
   resetTreatment(); measuredAt = new Date();
   measuredSample = sanitize($('sampleName').value);
   newMeasureRun();
@@ -654,19 +653,9 @@ function procData(a) {
   if (lastIndex >= 0) {
     const expected = (lastIndex + 1) & 0xff;
     if (a[0] !== expected) {
-      const fwd = (a[0] - expected + 256) & 0xff;
-      if (fwd <= 128) {
-        // Forward jump: cycles really were lost.
-        framesLost += fwd;
-        log('Frame gap: ' + fwd + ' lost (index ' + expected + ' -> ' + a[0] + ')', 'err');
-      } else {
-        // Backward step: a stale frame re-delivered by the BLE stack. Not a loss,
-        // and lastIndex stays put so the real frames keep being checked correctly.
-        dupFrames++;
-        if (dupFrames === 1)
-          log('Retried frame ignored (index ' + a[0] + ', ' + (256 - fwd) + ' step behind) — further repeats stay silent', 'rx');
-        return;
-      }
+      const missed = (a[0] - expected + 256) & 0xff;
+      framesLost += missed;
+      log('Frame gap: ' + missed + ' lost (index ' + expected + ' -> ' + a[0] + ')', 'err');
     }
   }
   lastIndex = a[0];
