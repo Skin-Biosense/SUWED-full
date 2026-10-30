@@ -142,7 +142,7 @@
 
 <header>
   <h1>Skin-Biosense</h1>
-  <span class="ver mono">version 5.3.3</span>
+  <span class="ver mono">version 5.3.5</span>
 </header>
 
 <div class="status">
@@ -258,8 +258,9 @@
   <div class="body">
     <p class="note" style="margin-top:0">Load previously exported .txt files to compare them with the current curve. Up to 10.</p>
     <div class="row" style="align-items:center">
-      <label class="filebtn" for="ovFile">Load files</label>
+      <label class="filebtn" for="ovFile">Import locally</label>
       <input id="ovFile" type="file" accept=".txt,text/plain" multiple hidden>
+      <button class="small" id="btnOvDrive">Import from Drive</button>
       <button class="small" id="btnClearOv">Clear</button>
     </div>
     <div id="ovList" class="note"></div>
@@ -299,7 +300,7 @@
 </dialog>
 
 <dialog id="dlgDrive">
-  <h2>Import from Drive</h2>
+  <h2 id="drvTitle">Import from Drive</h2>
   <div class="path" id="drvInfo"></div>
   <div id="drvList"></div>
   <div class="row">
@@ -311,7 +312,7 @@
 <script>
 "use strict";
 /* ============================================================================
-   Skin-Biosense v5.3.3
+   Skin-Biosense v5.3.5
    Port of the techBASIC "SUWED" program (Fluika OÜ) to Web Bluetooth.
    Runs in any browser exposing navigator.bluetooth — Bluefy / WebBLE on iPadOS,
    Chrome / Edge on Android. Deviations from the .bas are marked [DIFF].
@@ -1245,8 +1246,11 @@ async function importRawFile(file) {
 }
 
 /* --- Import from Drive ------------------------------------------------------
-   Lists the raw files of the connected sensor and loads one as the current run.
-   Its saves go back to its own measurement date, next to the original raw. */
+   Two uses, chosen by the button that opens the list:
+   - 'run'     : the file becomes the current run (saves go back next to it);
+   - 'overlay' : the file is added as an overlay (read only, up to 10).
+   Only raw files are listed. */
+let drvMode = 'run';
 async function driveCall(body) {
   const r = await fetch(GAS_URL, {
     method: 'POST',
@@ -1258,10 +1262,14 @@ async function driveCall(body) {
   if (!j.ok) throw new Error(j.error || 'refused');
   return j;
 }
-function openDriveImport() {
+function openDriveImport(mode) {
+  drvMode = mode === 'overlay' ? 'overlay' : 'run';
   if (!drive.ready) { log('Drive is not configured', 'err'); return; }
   if (!devName) { log('Connect the sensor first: its name selects the Drive folder', 'err'); return; }
-  $('drvInfo').textContent = DRIVE_ROOT + '/' + devName + '/ — raw files only';
+  if (drvMode === 'overlay' && overlays.length >= 10) { log('Overlays are limited to 10', 'err'); return; }
+  $('drvTitle').textContent = drvMode === 'overlay' ? 'Add overlay from Drive' : 'Import from Drive';
+  $('drvInfo').textContent = DRIVE_ROOT + '/' + devName + '/ — raw files only' +
+    (drvMode === 'overlay' ? ' — overlays are never written back' : '');
   $('dlgDrive').showModal();
   refreshDriveList();
 }
@@ -1289,6 +1297,7 @@ async function loadFromDrive(f) {
   try {
     const j = await driveCall({ action: 'get', id: f.id, device: f.device });
     const pairs = parseCurve(j.content);
+    if (drvMode === 'overlay') { addOverlayFromDrive(j.name, pairs, f); return; }
     $('dlgDrive').close();
     if (setImportRun({ origin: 'drive', name: j.name, pairs: pairs, device: f.device,
                        date: f.date, sub: f.sub, drive: true })) {
@@ -1296,6 +1305,15 @@ async function loadFromDrive(f) {
           (f.sub ? f.sub + '/' : '') + j.name + ' — saves replace its derived files after confirmation', 'ok');
     }
   } catch (e) { log('Drive load failed: ' + e.message, 'err'); }
+}
+function addOverlayFromDrive(name, pairs, f) {
+  if (overlays.length >= 10) { log('Overlays are limited to 10', 'err'); return; }
+  if (pairs.length < 25) { log('Overlay: not enough numeric points in ' + name, 'err'); return; }
+  overlays.push({ name: name, data: pairs, color: OV_COLORS[overlays.length % OV_COLORS.length], proc: null });
+  renderOverlays();
+  refreshAnalysis();
+  log('Overlay from Drive: ' + DRIVE_ROOT + '/' + f.device + '/' + f.date + '/raw/' +
+      (f.sub ? f.sub + '/' : '') + name + ' (' + overlays.length + '/10)', 'ok');
 }
 
 /* --- Save plan -------------------------------------------------------------- */
@@ -1514,18 +1532,16 @@ function setView(v) {
 /* Gaussian model of a set of peaks on the treated grid. Each peak is tapered to
    zero at its own integration bounds: the straight line joining its values at
    both bounds is removed, so the peak ends instead of being cut. */
+/* Each detected peak becomes its own Gaussian: same height, same position
+   (Epeak) and same FWHM, sitting on the zero baseline. The peaks do not
+   interact; the model is simply their sum. */
 function gaussianCurve(tr, peaks) {
-  const g = peaks.filter(p => p.fwhm > 0).map(p => ({
-    E: p.E, h: p.height, s: p.fwhm / 2.3548, a: p.vmin, b: p.vmax
-  }));
+  const g = peaks.filter(p => p.fwhm > 0).map(p => ({ E: p.E, h: p.height, s: p.fwhm / 2.3548 }));
   return tr.map(q => {
     let y = 0;
     for (const p of g) {
-      if (q[0] < p.a || q[0] > p.b) continue;
-      const G = x => Math.exp(-((x - p.E) * (x - p.E)) / (2 * p.s * p.s));
-      const ga = G(p.a), gb = G(p.b);
-      const t = (q[0] - p.a) / ((p.b - p.a) || 1);
-      y += p.h * (G(q[0]) - (ga + (gb - ga) * t));
+      const d = q[0] - p.E;
+      y += p.h * Math.exp(-(d * d) / (2 * p.s * p.s));
     }
     return [q[0], y];
   });
@@ -1677,6 +1693,7 @@ function refreshButtons() {
   const has = currentPairs().length > 0;
   $('btnImportLocal').disabled = !!cs.run;
   $('btnImportDrive').disabled = !!cs.run || !drive.ready || !devName;
+  $('btnOvDrive').disabled = !drive.ready || !devName || overlays.length >= 10;
   $('btnExport').disabled = !has;
   $('btnClear').disabled = !has;
   $('btnIntegrate').disabled = !(has || overlays.length > 0);
@@ -1717,7 +1734,8 @@ $('btnCancelSave').onclick = () => $('dlgSave').close();
 $('btnDoSave').onclick = () => { if (pendingPlan) executeSavePlan(pendingPlan); };
 $('btnImportLocal').onclick = () => $('importFile').click();
 $('importFile').onchange = e => { const f = e.target.files[0]; e.target.value = ''; if (f) importRawFile(f); };
-$('btnImportDrive').onclick = openDriveImport;
+$('btnImportDrive').onclick = () => openDriveImport('run');
+$('btnOvDrive').onclick = () => openDriveImport('overlay');
 $('btnDrvRefresh').onclick = refreshDriveList;
 $('btnDrvClose').onclick = () => $('dlgDrive').close();
 $('btnShare').onclick = () => shareOut(currentName(), exportText());
